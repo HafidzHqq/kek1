@@ -1,11 +1,13 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { LayoutDashboard, MessageSquare, Users, Settings, LogOut, Mail, UserCircle2 } from "lucide-react";
+import { LayoutDashboard, MessageSquare, Users, Settings, LogOut, Mail, UserCircle2, Clock } from "lucide-react";
 import { apiUrl } from '../lib/api';
 
 export function AdminDashboard({ onLogout }) {
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [active, setActive] = useState("overview");
+  const [conversations, setConversations] = useState([]);
+  const [selectedSession, setSelectedSession] = useState(null);
   const [chatMessages, setChatMessages] = useState([]);
   const [chatInput, setChatInput] = useState("");
 
@@ -20,25 +22,55 @@ export function AdminDashboard({ onLogout }) {
       .catch(() => setLoading(false));
   }, []);
 
-  // Polling untuk chat
+  // Polling untuk daftar conversations
   useEffect(() => {
     let timer;
-    const fetchChat = async () => {
+    const fetchConversations = async () => {
       try {
         const res = await fetch(apiUrl('/api/chat'));
         const data = await res.json();
+        if (data.conversations) {
+          setConversations(data.conversations);
+          // Auto select first conversation
+          if (!selectedSession && data.conversations.length > 0) {
+            setSelectedSession(data.conversations[0].sessionId);
+          }
+        }
+      } catch (e) {
+        console.error('Error fetching conversations:', e);
+      }
+    };
+    fetchConversations();
+    timer = setInterval(fetchConversations, 3000);
+    return () => clearInterval(timer);
+  }, [selectedSession]);
+
+  // Polling untuk chat messages dari selected session
+  useEffect(() => {
+    if (!selectedSession) return;
+    let timer;
+    const fetchChat = async () => {
+      try {
+        const res = await fetch(apiUrl(`/api/chat?sessionId=${selectedSession}`));
+        const data = await res.json();
         if (Array.isArray(data)) setChatMessages(data);
-      } catch {}
+      } catch (e) {
+        console.error('Error fetching chat:', e);
+      }
     };
     fetchChat();
     timer = setInterval(fetchChat, 2500);
     return () => clearInterval(timer);
-  }, []);
+  }, [selectedSession]);
 
   const sendChat = async () => {
-    if (!chatInput.trim()) return;
+    if (!chatInput.trim() || !selectedSession) return;
     try {
-      await fetch(apiUrl('/api/chat'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sender: 'admin', text: chatInput.trim() }) });
+      await fetch(apiUrl('/api/chat'), { 
+        method: 'POST', 
+        headers: { 'Content-Type': 'application/json' }, 
+        body: JSON.stringify({ sender: 'admin', text: chatInput.trim(), sessionId: selectedSession }) 
+      });
       setChatInput('');
     } catch {}
   };
@@ -126,35 +158,80 @@ export function AdminDashboard({ onLogout }) {
 
           {active === "chat" && (
             <section className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-              <div className="lg:col-span-1 bg-white/5 rounded-xl border border-white/10 overflow-hidden">
-                <div className="px-4 py-3 border-b border-white/10 font-semibold">Daftar Chat</div>
-                <div className="max-h-[60vh] overflow-y-auto">
-                  {messages.length === 0 ? (
-                    <div className="p-4 text-white/60">Belum ada chat.</div>
-                  ) : messages.map((m, i) => (
-                    <div key={i} className="p-4 hover:bg-white/5 cursor-pointer border-b border-white/5">
-                      <div className="font-medium">{m.name || 'User'}</div>
-                      <div className="text-sm text-white/60 truncate">{m.message || '-'}</div>
+              {/* Daftar Chat - Profesional */}
+              <div className="lg:col-span-1 bg-white/5 rounded-xl border border-white/10 overflow-hidden flex flex-col">
+                <div className="px-4 py-3 border-b border-white/10 font-semibold flex items-center justify-between">
+                  <span>Daftar Chat</span>
+                  <span className="text-xs bg-indigo-600 px-2 py-1 rounded-full">{conversations.length}</span>
+                </div>
+                <div className="flex-1 overflow-y-auto max-h-[60vh]">
+                  {conversations.length === 0 ? (
+                    <div className="p-4 text-white/60 text-center">Belum ada chat.</div>
+                  ) : conversations.map((conv) => (
+                    <div 
+                      key={conv.sessionId} 
+                      onClick={() => setSelectedSession(conv.sessionId)}
+                      className={`p-4 hover:bg-white/10 cursor-pointer border-b border-white/5 transition-all ${selectedSession === conv.sessionId ? 'bg-white/10 border-l-4 border-l-indigo-500' : ''}`}
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center flex-shrink-0">
+                          <UserCircle2 size={20} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-2 mb-1">
+                            <div className="font-medium text-sm truncate">User {conv.sessionId.substring(5, 15)}</div>
+                            {conv.unread > 0 && (
+                              <span className="bg-red-500 text-xs px-1.5 py-0.5 rounded-full">{conv.unread}</span>
+                            )}
+                          </div>
+                          <div className="text-xs text-white/60 truncate mb-1">{conv.lastMessage}</div>
+                          <div className="flex items-center gap-1 text-xs text-white/40">
+                            <Clock size={12} />
+                            <span>{new Date(conv.timestamp).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}</span>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   ))}
                 </div>
               </div>
+              {/* Ruang Chat */}
               <div className="lg:col-span-2 bg-white/5 rounded-xl border border-white/10 flex flex-col min-h-[60vh]">
-                <div className="px-4 py-3 border-b border-white/10 font-semibold">Ruang Chat</div>
+                <div className="px-4 py-3 border-b border-white/10 font-semibold">
+                  {selectedSession ? `Chat dengan User ${selectedSession.substring(5, 15)}` : 'Pilih Chat'}
+                </div>
                 <div className="flex-1 p-4 space-y-3 overflow-y-auto">
-                  {chatMessages.length === 0 ? (
-                    <div className="text-white/60">Belum ada percakapan.</div>
+                  {!selectedSession ? (
+                    <div className="text-white/60 text-center mt-10">Pilih chat dari daftar untuk memulai percakapan.</div>
+                  ) : chatMessages.length === 0 ? (
+                    <div className="text-white/60 text-center mt-10">Belum ada percakapan.</div>
                   ) : (
                     chatMessages.map((m, i) => (
                       <div key={i} className={`flex ${m.sender === 'admin' ? 'justify-end' : 'justify-start'}`}>
-                        <div className={`max-w-[70%] px-4 py-2 rounded-2xl ${m.sender === 'admin' ? 'bg-indigo-600' : 'bg-white/10'}`}>{m.text}</div>
+                        <div className={`max-w-[70%] px-4 py-2 rounded-2xl ${m.sender === 'admin' ? 'bg-indigo-600' : 'bg-white/10'}`}>
+                          <div>{m.text}</div>
+                          <div className="text-xs text-white/50 mt-1">{new Date(m.createdAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}</div>
+                        </div>
                       </div>
                     ))
                   )}
                 </div>
                 <div className="p-3 border-t border-white/10 flex gap-2">
-                  <input value={chatInput} onChange={(e)=>setChatInput(e.target.value)} className="flex-1 bg-white/10 rounded-lg px-3 py-2 outline-none focus:ring-2 ring-indigo-600" placeholder="Tulis pesan..." />
-                  <button onClick={sendChat} className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700">Kirim</button>
+                  <input 
+                    value={chatInput} 
+                    onChange={(e)=>setChatInput(e.target.value)} 
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); sendChat(); } }}
+                    className="flex-1 bg-white/10 rounded-lg px-3 py-2 outline-none focus:ring-2 ring-indigo-600" 
+                    placeholder={selectedSession ? "Tulis pesan..." : "Pilih chat terlebih dahulu"}
+                    disabled={!selectedSession}
+                  />
+                  <button 
+                    onClick={sendChat} 
+                    disabled={!selectedSession || !chatInput.trim()}
+                    className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Kirim
+                  </button>
                 </div>
               </div>
             </section>

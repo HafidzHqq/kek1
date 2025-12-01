@@ -6,12 +6,20 @@ const Chat = ({ role = 'user' }) => {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [error, setError] = useState('');
+  const [sessionId] = useState(() => {
+    let id = localStorage.getItem('chatSessionId');
+    if (!id) {
+      id = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+      localStorage.setItem('chatSessionId', id);
+    }
+    return id;
+  });
   const pollRef = useRef(null);
 
   const fetchMessages = async () => {
     try {
-      console.log('Fetching from:', apiUrl('/api/chat'));
-      const { data } = await axios.get(apiUrl('/api/chat'));
+      console.log('Fetching from:', apiUrl(`/api/chat?sessionId=${sessionId}`));
+      const { data } = await axios.get(apiUrl(`/api/chat?sessionId=${sessionId}`));
       if (Array.isArray(data)) setMessages(data);
       setError('');
     } catch (e) {
@@ -30,7 +38,7 @@ const Chat = ({ role = 'user' }) => {
     if (!input.trim()) return;
     try {
       console.log('Sending to:', apiUrl('/api/chat'));
-      await axios.post(apiUrl('/api/chat'), { sender: role, text: input.trim() });
+      await axios.post(apiUrl('/api/chat'), { sender: role, text: input.trim(), sessionId });
       setInput('');
       setError('');
       fetchMessages();
