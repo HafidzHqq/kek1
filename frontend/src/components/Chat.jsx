@@ -15,12 +15,29 @@ const Chat = ({ role = 'user' }) => {
     return id;
   });
   const pollRef = useRef(null);
+  const messagesEndRef = useRef(null);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
 
   const fetchMessages = async () => {
     try {
       console.log('Fetching from:', apiUrl(`/api/chat?sessionId=${sessionId}`));
       const { data } = await axios.get(apiUrl(`/api/chat?sessionId=${sessionId}`));
-      if (Array.isArray(data)) setMessages(data);
+      if (Array.isArray(data)) {
+        setMessages(prev => {
+          // Only update if messages actually changed
+          if (JSON.stringify(prev) !== JSON.stringify(data)) {
+            return data;
+          }
+          return prev;
+        });
+      }
       setError('');
     } catch (e) {
       console.error('Fetch error:', e);
@@ -72,12 +89,13 @@ const Chat = ({ role = 'user' }) => {
       <div className="flex-1 px-4 py-6 overflow-y-auto">
         <div className="max-w-2xl mx-auto">
           {messages.map((msg, idx) => (
-            <div key={idx} className={`mb-4 flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}> 
+            <div key={`${msg.createdAt}-${idx}`} className={`mb-4 flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}> 
               <span className={`px-5 py-3 rounded-2xl shadow-lg text-base ${msg.sender === 'user' ? 'bg-blue-600' : 'bg-purple-700'} `}>
                 {msg.text}
               </span>
             </div>
           ))}
+          <div ref={messagesEndRef} />
         </div>
       </div>
       {/* Input Chat */}

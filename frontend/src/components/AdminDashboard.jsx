@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useRef } from "react";
 import { LayoutDashboard, MessageSquare, Users, Settings, LogOut, Mail, UserCircle2, Clock } from "lucide-react";
 import { apiUrl } from '../lib/api';
 
@@ -10,6 +10,15 @@ export function AdminDashboard({ onLogout }) {
   const [selectedSession, setSelectedSession] = useState(null);
   const [chatMessages, setChatMessages] = useState([]);
   const [chatInput, setChatInput] = useState("");
+  const chatEndRef = useRef(null);
+
+  const scrollToBottom = () => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [chatMessages]);
 
   useEffect(() => {
     // Dummy fetch; ganti dengan API nyata jika tersedia
@@ -30,11 +39,13 @@ export function AdminDashboard({ onLogout }) {
         const res = await fetch(apiUrl('/api/chat'));
         const data = await res.json();
         if (data.conversations) {
-          setConversations(data.conversations);
-          // Auto select first conversation
-          if (!selectedSession && data.conversations.length > 0) {
-            setSelectedSession(data.conversations[0].sessionId);
-          }
+          setConversations(prev => {
+            // Only update if actually changed to prevent re-render
+            if (JSON.stringify(prev) !== JSON.stringify(data.conversations)) {
+              return data.conversations;
+            }
+            return prev;
+          });
         }
       } catch (e) {
         console.error('Error fetching conversations:', e);
@@ -43,7 +54,7 @@ export function AdminDashboard({ onLogout }) {
     fetchConversations();
     timer = setInterval(fetchConversations, 3000);
     return () => clearInterval(timer);
-  }, [selectedSession]);
+  }, []); // Remove selectedSession dependency
 
   // Polling untuk chat messages dari selected session
   useEffect(() => {
@@ -53,7 +64,15 @@ export function AdminDashboard({ onLogout }) {
       try {
         const res = await fetch(apiUrl(`/api/chat?sessionId=${selectedSession}`));
         const data = await res.json();
-        if (Array.isArray(data)) setChatMessages(data);
+        if (Array.isArray(data)) {
+          setChatMessages(prev => {
+            // Only update if messages actually changed
+            if (JSON.stringify(prev) !== JSON.stringify(data)) {
+              return data;
+            }
+            return prev;
+          });
+        }
       } catch (e) {
         console.error('Error fetching chat:', e);
       }
@@ -206,14 +225,17 @@ export function AdminDashboard({ onLogout }) {
                   ) : chatMessages.length === 0 ? (
                     <div className="text-white/60 text-center mt-10">Belum ada percakapan.</div>
                   ) : (
-                    chatMessages.map((m, i) => (
-                      <div key={i} className={`flex ${m.sender === 'admin' ? 'justify-end' : 'justify-start'}`}>
-                        <div className={`max-w-[70%] px-4 py-2 rounded-2xl ${m.sender === 'admin' ? 'bg-indigo-600' : 'bg-white/10'}`}>
-                          <div>{m.text}</div>
-                          <div className="text-xs text-white/50 mt-1">{new Date(m.createdAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}</div>
+                    <>
+                      {chatMessages.map((m, i) => (
+                        <div key={`${m.createdAt}-${i}`} className={`flex ${m.sender === 'admin' ? 'justify-end' : 'justify-start'}`}>
+                          <div className={`max-w-[70%] px-4 py-2 rounded-2xl ${m.sender === 'admin' ? 'bg-indigo-600' : 'bg-white/10'}`}>
+                            <div>{m.text}</div>
+                            <div className="text-xs text-white/50 mt-1">{new Date(m.createdAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}</div>
+                          </div>
                         </div>
-                      </div>
-                    ))
+                      ))}
+                      <div ref={chatEndRef} />
+                    </>
                   )}
                 </div>
                 <div className="p-3 border-t border-white/10 flex gap-2">
