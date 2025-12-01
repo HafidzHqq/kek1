@@ -40,20 +40,13 @@ export function AdminDashboard({ onLogout }) {
         const res = await fetch(apiUrl('/api/chat'));
         const data = await res.json();
         if (data.conversations) {
-          setConversations(prev => {
-            // Only update if actually changed to prevent re-render
-            const prevStr = JSON.stringify(prev);
-            const newStr = JSON.stringify(data.conversations);
-            if (prevStr !== newStr) {
-              // Auto-select first conversation only once
-              if (!hasAutoSelected.current && !selectedSession && data.conversations.length > 0) {
-                setSelectedSession(data.conversations[0].sessionId);
-                hasAutoSelected.current = true;
-              }
-              return data.conversations;
-            }
-            return prev;
-          });
+          setConversations(data.conversations);
+          
+          // Auto-select first conversation only once
+          if (!hasAutoSelected.current && !selectedSession && data.conversations.length > 0) {
+            setSelectedSession(data.conversations[0].sessionId);
+            hasAutoSelected.current = true;
+          }
         }
       } catch (e) {
         console.error('Error fetching conversations:', e);
@@ -76,21 +69,26 @@ export function AdminDashboard({ onLogout }) {
         const data = await res.json();
         if (Array.isArray(data) && isMounted) {
           setChatMessages(prev => {
-            // Merge server data dengan optimistic updates
+            // Create a map of existing messages by createdAt
+            const existingMap = new Map();
+            prev.forEach(m => {
+              if (m.createdAt) existingMap.set(m.createdAt, m);
+            });
+            
+            // Add server messages to map (server is source of truth for sent messages)
+            data.forEach(m => {
+              existingMap.set(m.createdAt, m);
+            });
+            
+            // Keep temp messages that are still sending or failed
             const tempMessages = prev.filter(m => m._tempId && (m._sending || m._failed));
-            const serverMessageIds = new Set(data.map(m => m.createdAt));
             
-            // Remove temp messages yang sudah ada di server
-            const validTempMessages = tempMessages.filter(m => !serverMessageIds.has(m.createdAt));
+            // Combine: confirmed messages + temp messages
+            const result = [...existingMap.values(), ...tempMessages].sort((a, b) => 
+              new Date(a.createdAt) - new Date(b.createdAt)
+            );
             
-            // Combine: server messages + pending temp messages
-            const merged = [...data, ...validTempMessages];
-            
-            // Only update if actually changed
-            if (JSON.stringify(prev) !== JSON.stringify(merged)) {
-              return merged;
-            }
-            return prev;
+            return result;
           });
         }
       } catch (e) {
@@ -118,8 +116,14 @@ export function AdminDashboard({ onLogout }) {
       _sending: true
     };
     
+    console.log('Sending message:', optimisticMessage);
+    
     // Optimistic update - langsung tampilkan di UI
-    setChatMessages(prev => [...prev, optimisticMessage]);
+    setChatMessages(prev => {
+      const newMessages = [...prev, optimisticMessage];
+      console.log('Messages after optimistic update:', newMessages.length);
+      return newMessages;
+    });
     setChatInput('');
     
     try {
@@ -132,10 +136,14 @@ export function AdminDashboard({ onLogout }) {
       if (res.ok) {
         // Replace temp message with server response
         const serverMessage = await res.json();
-        setChatMessages(prev => 
-          prev.map(m => m._tempId === tempId ? { ...serverMessage, _sent: true } : m)
-        );
+        console.log('Server response:', serverMessage);
+        setChatMessages(prev => {
+          const updated = prev.map(m => m._tempId === tempId ? { ...serverMessage, _sent: true } : m);
+          console.log('Messages after server confirm:', updated.length);
+          return updated;
+        });
       } else {
+        console.error('Send failed with status:', res.status);
         // Mark as failed
         setChatMessages(prev => 
           prev.map(m => m._tempId === tempId ? { ...m, _failed: true, _sending: false } : m)

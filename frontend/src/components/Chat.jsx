@@ -31,21 +31,26 @@ const Chat = ({ role = 'user' }) => {
       const { data } = await axios.get(apiUrl(`/api/chat?sessionId=${sessionId}`));
       if (Array.isArray(data)) {
         setMessages(prev => {
-          // Merge server data dengan optimistic updates
+          // Create a map of existing messages by createdAt
+          const existingMap = new Map();
+          prev.forEach(m => {
+            if (m.createdAt) existingMap.set(m.createdAt, m);
+          });
+          
+          // Add server messages to map (server is source of truth)
+          data.forEach(m => {
+            existingMap.set(m.createdAt, m);
+          });
+          
+          // Keep temp messages that are still sending or failed
           const tempMessages = prev.filter(m => m._tempId && (m._sending || m._failed));
-          const serverMessageIds = new Set(data.map(m => m.createdAt));
           
-          // Remove temp messages yang sudah ada di server
-          const validTempMessages = tempMessages.filter(m => !serverMessageIds.has(m.createdAt));
+          // Combine: confirmed messages + temp messages
+          const result = [...existingMap.values(), ...tempMessages].sort((a, b) => 
+            new Date(a.createdAt) - new Date(b.createdAt)
+          );
           
-          // Combine: server messages + pending temp messages
-          const merged = [...data, ...validTempMessages];
-          
-          // Only update if actually changed
-          if (JSON.stringify(prev) !== JSON.stringify(merged)) {
-            return merged;
-          }
-          return prev;
+          return result;
         });
       }
       setError('');
