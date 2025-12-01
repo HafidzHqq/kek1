@@ -1,17 +1,21 @@
 import React, { useEffect, useRef, useState } from 'react';
 import axios from 'axios';
-import { apiUrl } from '../lib/api';
+import { apiUrl, API_BASE } from '../lib/api';
 
 const Chat = ({ role = 'user' }) => {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
+  const [error, setError] = useState('');
   const pollRef = useRef(null);
 
   const fetchMessages = async () => {
     try {
       const { data } = await axios.get(apiUrl('/api/chat'));
       if (Array.isArray(data)) setMessages(data);
-    } catch {}
+      setError('');
+    } catch (e) {
+      setError('Gagal memuat pesan. Pastikan API_BASE sudah benar.');
+    }
   };
 
   useEffect(() => {
@@ -25,8 +29,11 @@ const Chat = ({ role = 'user' }) => {
     try {
       await axios.post(apiUrl('/api/chat'), { sender: role, text: input.trim() });
       setInput('');
+      setError('');
       fetchMessages();
-    } catch {}
+    } catch (e) {
+      setError('Gagal mengirim. Periksa koneksi dan API_BASE.');
+    }
   };
 
   return (
@@ -44,6 +51,18 @@ const Chat = ({ role = 'user' }) => {
         </div>
         <div className="text-purple-400 font-semibold">Live Chat</div>
       </div>
+      {/* Info koneksi */}
+      {API_BASE === '' && (
+        <div className="px-8 py-3 bg-yellow-600/20 text-yellow-300 text-sm">
+          Frontend dan backend beda domain? Set dulu API_BASE di Console:
+          <code className="ml-2 bg-black/30 px-2 py-0.5 rounded">localStorage.setItem('API_BASE','https://domain-backend-Anda')</code>
+          , lalu refresh.
+        </div>
+      )}
+      {error && (
+        <div className="px-8 py-3 bg-red-600/20 text-red-300 text-sm">{error}</div>
+      )}
+
       {/* Bubble Chat */}
       <div className="flex-1 px-4 py-6 overflow-y-auto">
         <div className="max-w-2xl mx-auto">
@@ -63,11 +82,13 @@ const Chat = ({ role = 'user' }) => {
           type="text"
           value={input}
           onChange={e => setInput(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleSend(); } }}
           placeholder="Tulis pesan..."
         />
         <button
           className="ml-4 px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full text-white font-semibold shadow-lg hover:from-blue-700 hover:to-purple-700 transition-all"
           onClick={handleSend}
+          disabled={!input.trim()}
         >
           Kirim
         </button>
