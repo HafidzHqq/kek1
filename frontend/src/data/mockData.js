@@ -112,21 +112,21 @@ export const portfolioProjects = [
 export const testimonials = [
   {
     id: 1,
-    name: 'Sarah Johnson',
+    name: 'Stepen wang jian',
     role: 'CEO, TechStart Inc',
     content: 'Astra Web Studio transformed our vision into reality. Their attention to detail and technical expertise exceeded our expectations.',
     rating: 5
   },
   {
     id: 2,
-    name: 'Michael Chen',
+    name: 'Faisal sipesel',
     role: 'Founder, Digital Ventures',
     content: 'Working with Astra was seamless. They delivered a stunning website on time and provided exceptional post-launch support.',
     rating: 5
   },
   {
     id: 3,
-    name: 'Emily Rodriguez',
+    name: 'Hafidz Handsome',
     role: 'Marketing Director, GrowthCo',
     content: 'The team\'s creativity and professionalism made the entire process enjoyable. Our new brand identity is absolutely perfect.',
     rating: 5
@@ -137,7 +137,7 @@ export const pricingPlans = [
   {
     id: 1,
     name: 'Starter',
-    price: '$999',
+    price: 'Rp. 100.000 - 1.000.000',
     description: 'Perfect for small businesses and startups',
     features: [
       'Responsive Design',
@@ -152,7 +152,7 @@ export const pricingPlans = [
   {
     id: 2,
     name: 'Pro',
-    price: '$2,499',
+    price: 'Rp. > 1.000.000',
     description: 'Ideal for growing businesses',
     features: [
       'All Starter Features',

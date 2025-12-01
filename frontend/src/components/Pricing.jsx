@@ -16,7 +16,7 @@ export const Pricing = () => {
 
   return (
     <section id="pricing" className="py-24 bg-gradient-to-b from-black via-gray-900 to-black">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
         {/* Section Header */}
         <motion.div
           initial={{ opacity: 0, y: 30 }}
@@ -45,7 +45,7 @@ export const Pricing = () => {
               className={plan.popular ? 'md:-mt-4' : ''}
             >
               <Card
-                className={`group h-full relative overflow-hidden transition-all duration-300 ${
+                className={`group h-full relative overflow-hidden transition-all duration-300 flex flex-col ${
                   plan.popular
                     ? 'bg-gradient-to-br from-blue-900/50 to-purple-900/50 border-2 border-purple-500 shadow-2xl shadow-purple-500/20'
                     : 'bg-gray-900 border-gray-800 hover:border-purple-500/50 hover:shadow-xl hover:shadow-purple-500/10'
@@ -58,7 +58,7 @@ export const Pricing = () => {
                     </Badge>
                   </div>
                 )}
-                <CardContent className="p-8">
+                <CardContent className="p-10 flex flex-col flex-1">
                   {/* Plan Name */}
                   <h3 className="text-2xl font-bold text-white mb-2">{plan.name}</h3>
                   <p className="text-gray-400 text-sm mb-6">{plan.description}</p>
@@ -66,7 +66,7 @@ export const Pricing = () => {
                   {/* Price */}
                   <div className="mb-8">
                     <div className="flex items-baseline gap-2">
-                      <span className="text-5xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
+                      <span className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
                         {plan.price}
                       </span>
                       {plan.price !== 'Custom' && (
@@ -76,7 +76,7 @@ export const Pricing = () => {
                   </div>
 
                   {/* Features */}
-                  <ul className="space-y-4 mb-8">
+                  <ul className="space-y-4 mb-8 flex-1">
                     {plan.features.map((feature, featureIndex) => (
                       <li key={featureIndex} className="flex items-start gap-3">
                         <div className="w-5 h-5 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center mt-0.5 flex-shrink-0">

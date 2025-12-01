@@ -40,15 +40,15 @@ export const Navbar = () => {
       }`}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-20">
+        <div className="flex items-center justify-between h-16 md:h-20">
           {/* Logo */}
           <motion.div
             whileHover={{ scale: 1.05 }}
             className="flex items-center cursor-pointer"
             onClick={() => scrollToSection('home')}
           >
-            <span className="text-2xl font-bold bg-gradient-to-r from-blue-500 to-purple-600 bg-clip-text text-transparent">
-              Astra Web Studio
+            <span className="text-lg sm:text-xl md:text-2xl font-bold bg-gradient-to-r from-blue-500 to-purple-600 bg-clip-text text-transparent">
+              Inovatech
             </span>
           </motion.div>
 
@@ -75,7 +75,8 @@ export const Navbar = () => {
           <div className="md:hidden">
             <button
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className="text-white p-2"
+              className="text-white p-2 hover:bg-white/10 rounded-lg transition-colors"
+              aria-label="Toggle menu"
             >
               {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
             </button>
@@ -86,26 +87,38 @@ export const Navbar = () => {
       {/* Mobile Menu */}
       {isMobileMenuOpen && (
         <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="md:hidden bg-black/95 backdrop-blur-lg"
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: 'auto' }}
+          exit={{ opacity: 0, height: 0 }}
+          transition={{ duration: 0.3 }}
+          className="md:hidden bg-black/95 backdrop-blur-lg border-t border-gray-800"
         >
-          <div className="px-4 pt-2 pb-6 space-y-3">
-            {navLinks.map((link) => (
-              <button
+          <div className="px-6 py-6 space-y-1">
+            {navLinks.map((link, index) => (
+              <motion.button
                 key={link.id}
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: index * 0.1 }}
                 onClick={() => scrollToSection(link.id)}
-                className="block w-full text-left text-gray-300 hover:text-white py-2 transition-colors duration-200"
+                className="block w-full text-left text-gray-300 hover:text-white hover:bg-white/5 py-3 px-4 rounded-lg transition-all duration-200 font-medium"
               >
                 {link.name}
-              </button>
+              </motion.button>
             ))}
-            <Button
-              onClick={() => scrollToSection('contact')}
-              className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-full mt-4"
+            <motion.div
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: navLinks.length * 0.1 }}
+              className="pt-4"
             >
-              Contact Us
-            </Button>
+              <Button
+                onClick={() => scrollToSection('contact')}
+                className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-full py-3 font-semibold shadow-lg shadow-purple-500/20"
+              >
+                Contact Us
+              </Button>
+            </motion.div>
           </div>
         </motion.div>
       )}

@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Facebook, Twitter, Instagram, Linkedin, Github, Mail } from 'lucide-react';
+import { Facebook, Instagram, Linkedin, Github, Mail } from 'lucide-react';
 
 export const Footer = () => {
   const currentYear = new Date().getFullYear();
@@ -28,29 +28,38 @@ export const Footer = () => {
 
   const socialLinks = [
     { icon: Facebook, href: '#', label: 'Facebook' },
-    { icon: Twitter, href: '#', label: 'Twitter' },
     { icon: Instagram, href: '#', label: 'Instagram' },
     { icon: Linkedin, href: '#', label: 'LinkedIn' },
     { icon: Github, href: '#', label: 'GitHub' },
+  ];
+
+  const partnerLogos = [
+    { src: 'https://via.placeholder.com/150x50?text=Partner+1', alt: 'Partner 1', href: '#' },
+    { src: 'https://via.placeholder.com/150x50?text=Partner+2', alt: 'Partner 2', href: '#' },
+    { src: 'https://via.placeholder.com/150x50?text=Partner+3', alt: 'Partner 3', href: '#' },
+    { src: 'https://via.placeholder.com/150x50?text=Partner+4', alt: 'Partner 4', href: '#' },
+    { src: 'https://via.placeholder.com/150x50?text=Partner+5', alt: 'Partner 5', href: '#' },
   ];
 
   return (
     <footer className="bg-black border-t border-gray-800">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8 mb-12">
-          {/* Brand Column */}
+          {/* Brand Column with LogoLoop */}
           <div className="lg:col-span-2">
             <motion.div
               whileHover={{ scale: 1.05 }}
               className="inline-block mb-4"
             >
               <h3 className="text-2xl font-bold bg-gradient-to-r from-blue-500 to-purple-600 bg-clip-text text-transparent">
-                Astra Web Studio
+                Inovatech Studio
               </h3>
             </motion.div>
             <p className="text-gray-400 mb-6 max-w-sm">
               Crafting exceptional digital experiences that drive results and inspire innovation.
             </p>
+            
+            {/* Social Links */}
             <div className="flex items-center gap-4">
               {socialLinks.map((social, index) => (
                 <motion.a
@@ -115,7 +124,7 @@ export const Footer = () => {
         <div className="border-t border-gray-800 pt-8">
           <div className="flex flex-col md:flex-row justify-between items-center gap-4">
             <p className="text-gray-400 text-sm">
-              © {currentYear} Astra Web Studio. All rights reserved.
+              © {currentYear} Inovatech Studio. All rights reserved.
             </p>
             <div className="flex gap-6">
               <a href="#" className="text-gray-400 hover:text-purple-400 text-sm transition-colors duration-200">
