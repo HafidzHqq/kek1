@@ -2,10 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Menu, X } from 'lucide-react';
 import { Button } from './ui/button';
+import { useNavigate } from 'react-router-dom';
 
 export const Navbar = () => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -69,6 +71,12 @@ export const Navbar = () => {
             >
               Contact Us
             </Button>
+            <Button
+              onClick={() => navigate('/admin')}
+              className="bg-white/10 hover:bg-white/15 text-white rounded-full px-6"
+            >
+              Dashboard
+            </Button>
           </div>
 
           {/* Mobile Menu Button */}
@@ -118,6 +126,14 @@ export const Navbar = () => {
               >
                 Contact Us
               </Button>
+              <div className="mt-3">
+                <Button
+                  onClick={() => { setIsMobileMenuOpen(false); navigate('/admin'); }}
+                  className="w-full bg-white/10 hover:bg-white/15 text-white rounded-full py-3 font-semibold"
+                >
+                  Dashboard
+                </Button>
+              </div>
             </motion.div>
           </div>
         </motion.div>
