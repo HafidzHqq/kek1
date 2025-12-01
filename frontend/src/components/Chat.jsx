@@ -51,14 +51,7 @@ const Chat = ({ role = 'user' }) => {
         </div>
         <div className="text-purple-400 font-semibold">Live Chat</div>
       </div>
-      {/* Info koneksi */}
-      {API_BASE === '' && (
-        <div className="px-8 py-3 bg-yellow-600/20 text-yellow-300 text-sm">
-          Frontend dan backend beda domain? Set dulu API_BASE di Console:
-          <code className="ml-2 bg-black/30 px-2 py-0.5 rounded">localStorage.setItem('API_BASE','https://domain-backend-Anda')</code>
-          , lalu refresh.
-        </div>
-      )}
+      {/* Info error */}
       {error && (
         <div className="px-8 py-3 bg-red-600/20 text-red-300 text-sm">{error}</div>
       )}
