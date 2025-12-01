@@ -10,11 +10,13 @@ const Chat = ({ role = 'user' }) => {
 
   const fetchMessages = async () => {
     try {
+      console.log('Fetching from:', apiUrl('/api/chat'));
       const { data } = await axios.get(apiUrl('/api/chat'));
       if (Array.isArray(data)) setMessages(data);
       setError('');
     } catch (e) {
-      setError('Gagal memuat pesan. Pastikan API_BASE sudah benar.');
+      console.error('Fetch error:', e);
+      setError(`Gagal memuat pesan: ${e.message}`);
     }
   };
 
@@ -27,12 +29,14 @@ const Chat = ({ role = 'user' }) => {
   const handleSend = async () => {
     if (!input.trim()) return;
     try {
+      console.log('Sending to:', apiUrl('/api/chat'));
       await axios.post(apiUrl('/api/chat'), { sender: role, text: input.trim() });
       setInput('');
       setError('');
       fetchMessages();
     } catch (e) {
-      setError('Gagal mengirim. Periksa koneksi dan API_BASE.');
+      console.error('Send error:', e);
+      setError(`Gagal mengirim: ${e.message}`);
     }
   };
 
