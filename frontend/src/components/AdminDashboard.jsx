@@ -11,6 +11,7 @@ export function AdminDashboard({ onLogout }) {
   const [chatMessages, setChatMessages] = useState([]);
   const [chatInput, setChatInput] = useState("");
   const chatEndRef = useRef(null);
+  const hasAutoSelected = useRef(false);
 
   const scrollToBottom = () => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -41,7 +42,14 @@ export function AdminDashboard({ onLogout }) {
         if (data.conversations) {
           setConversations(prev => {
             // Only update if actually changed to prevent re-render
-            if (JSON.stringify(prev) !== JSON.stringify(data.conversations)) {
+            const prevStr = JSON.stringify(prev);
+            const newStr = JSON.stringify(data.conversations);
+            if (prevStr !== newStr) {
+              // Auto-select first conversation only once
+              if (!hasAutoSelected.current && !selectedSession && data.conversations.length > 0) {
+                setSelectedSession(data.conversations[0].sessionId);
+                hasAutoSelected.current = true;
+              }
               return data.conversations;
             }
             return prev;
@@ -54,20 +62,24 @@ export function AdminDashboard({ onLogout }) {
     fetchConversations();
     timer = setInterval(fetchConversations, 3000);
     return () => clearInterval(timer);
-  }, []); // Remove selectedSession dependency
+  }, [selectedSession]);
 
   // Polling untuk chat messages dari selected session
   useEffect(() => {
     if (!selectedSession) return;
     let timer;
+    let isMounted = true;
+    
     const fetchChat = async () => {
       try {
         const res = await fetch(apiUrl(`/api/chat?sessionId=${selectedSession}`));
         const data = await res.json();
-        if (Array.isArray(data)) {
+        if (Array.isArray(data) && isMounted) {
           setChatMessages(prev => {
             // Only update if messages actually changed
-            if (JSON.stringify(prev) !== JSON.stringify(data)) {
+            const prevStr = JSON.stringify(prev);
+            const newStr = JSON.stringify(data);
+            if (prevStr !== newStr) {
               return data;
             }
             return prev;
@@ -79,7 +91,10 @@ export function AdminDashboard({ onLogout }) {
     };
     fetchChat();
     timer = setInterval(fetchChat, 2500);
-    return () => clearInterval(timer);
+    return () => {
+      isMounted = false;
+      clearInterval(timer);
+    };
   }, [selectedSession]);
 
   const sendChat = async () => {
@@ -91,7 +106,13 @@ export function AdminDashboard({ onLogout }) {
         body: JSON.stringify({ sender: 'admin', text: chatInput.trim(), sessionId: selectedSession }) 
       });
       setChatInput('');
-    } catch {}
+      // Immediately fetch new messages after sending
+      const res = await fetch(apiUrl(`/api/chat?sessionId=${selectedSession}`));
+      const data = await res.json();
+      if (Array.isArray(data)) setChatMessages(data);
+    } catch (e) {
+      console.error('Error sending chat:', e);
+    }
   };
 
   const stats = useMemo(() => ({
