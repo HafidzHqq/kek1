@@ -76,11 +76,19 @@ export function AdminDashboard({ onLogout }) {
         const data = await res.json();
         if (Array.isArray(data) && isMounted) {
           setChatMessages(prev => {
-            // Only update if messages actually changed
-            const prevStr = JSON.stringify(prev);
-            const newStr = JSON.stringify(data);
-            if (prevStr !== newStr) {
-              return data;
+            // Merge server data dengan optimistic updates
+            const tempMessages = prev.filter(m => m._tempId && (m._sending || m._failed));
+            const serverMessageIds = new Set(data.map(m => m.createdAt));
+            
+            // Remove temp messages yang sudah ada di server
+            const validTempMessages = tempMessages.filter(m => !serverMessageIds.has(m.createdAt));
+            
+            // Combine: server messages + pending temp messages
+            const merged = [...data, ...validTempMessages];
+            
+            // Only update if actually changed
+            if (JSON.stringify(prev) !== JSON.stringify(merged)) {
+              return merged;
             }
             return prev;
           });
@@ -99,19 +107,46 @@ export function AdminDashboard({ onLogout }) {
 
   const sendChat = async () => {
     if (!chatInput.trim() || !selectedSession) return;
+    
+    const messageText = chatInput.trim();
+    const tempId = `temp-${Date.now()}`;
+    const optimisticMessage = {
+      sender: 'admin',
+      text: messageText,
+      createdAt: new Date().toISOString(),
+      _tempId: tempId,
+      _sending: true
+    };
+    
+    // Optimistic update - langsung tampilkan di UI
+    setChatMessages(prev => [...prev, optimisticMessage]);
+    setChatInput('');
+    
     try {
-      await fetch(apiUrl('/api/chat'), { 
+      const res = await fetch(apiUrl('/api/chat'), { 
         method: 'POST', 
         headers: { 'Content-Type': 'application/json' }, 
-        body: JSON.stringify({ sender: 'admin', text: chatInput.trim(), sessionId: selectedSession }) 
+        body: JSON.stringify({ sender: 'admin', text: messageText, sessionId: selectedSession }) 
       });
-      setChatInput('');
-      // Immediately fetch new messages after sending
-      const res = await fetch(apiUrl(`/api/chat?sessionId=${selectedSession}`));
-      const data = await res.json();
-      if (Array.isArray(data)) setChatMessages(data);
+      
+      if (res.ok) {
+        // Replace temp message with server response
+        const serverMessage = await res.json();
+        setChatMessages(prev => 
+          prev.map(m => m._tempId === tempId ? { ...serverMessage, _sent: true } : m)
+        );
+      } else {
+        // Mark as failed
+        setChatMessages(prev => 
+          prev.map(m => m._tempId === tempId ? { ...m, _failed: true, _sending: false } : m)
+        );
+      }
     } catch (e) {
       console.error('Error sending chat:', e);
+      // Mark as failed
+      setChatMessages(prev => 
+        prev.map(m => m._tempId === tempId ? { ...m, _failed: true, _sending: false } : m)
+      );
     }
   };
 
@@ -248,10 +283,30 @@ export function AdminDashboard({ onLogout }) {
                   ) : (
                     <>
                       {chatMessages.map((m, i) => (
-                        <div key={`${m.createdAt}-${i}`} className={`flex ${m.sender === 'admin' ? 'justify-end' : 'justify-start'}`}>
-                          <div className={`max-w-[70%] px-4 py-2 rounded-2xl ${m.sender === 'admin' ? 'bg-indigo-600' : 'bg-white/10'}`}>
-                            <div>{m.text}</div>
-                            <div className="text-xs text-white/50 mt-1">{new Date(m.createdAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}</div>
+                        <div key={m._tempId || `${m.createdAt}-${i}`} className={`flex ${m.sender === 'admin' ? 'justify-end' : 'justify-start'}`}>
+                          <div className={`max-w-[70%] px-4 py-2 rounded-2xl ${
+                            m.sender === 'admin' 
+                              ? m._failed 
+                                ? 'bg-red-600/70' 
+                                : m._sending 
+                                  ? 'bg-indigo-600/70' 
+                                  : 'bg-indigo-600' 
+                              : 'bg-white/10'
+                          }`}>
+                            <div className="flex items-start gap-2">
+                              <div className="flex-1">{m.text}</div>
+                              {m.sender === 'admin' && (
+                                <div className="text-xs mt-0.5">
+                                  {m._sending && <span title="Mengirim...">⏳</span>}
+                                  {m._failed && <span title="Gagal kirim">❌</span>}
+                                  {!m._sending && !m._failed && <span title="Terkirim">✓</span>}
+                                </div>
+                              )}
+                            </div>
+                            <div className="text-xs text-white/50 mt-1 flex items-center gap-1">
+                              <span>{new Date(m.createdAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}</span>
+                              {m._failed && <span className="text-red-300">(Gagal)</span>}
+                            </div>
                           </div>
                         </div>
                       ))}

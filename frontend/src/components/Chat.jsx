@@ -31,9 +31,19 @@ const Chat = ({ role = 'user' }) => {
       const { data } = await axios.get(apiUrl(`/api/chat?sessionId=${sessionId}`));
       if (Array.isArray(data)) {
         setMessages(prev => {
-          // Only update if messages actually changed
-          if (JSON.stringify(prev) !== JSON.stringify(data)) {
-            return data;
+          // Merge server data dengan optimistic updates
+          const tempMessages = prev.filter(m => m._tempId && (m._sending || m._failed));
+          const serverMessageIds = new Set(data.map(m => m.createdAt));
+          
+          // Remove temp messages yang sudah ada di server
+          const validTempMessages = tempMessages.filter(m => !serverMessageIds.has(m.createdAt));
+          
+          // Combine: server messages + pending temp messages
+          const merged = [...data, ...validTempMessages];
+          
+          // Only update if actually changed
+          if (JSON.stringify(prev) !== JSON.stringify(merged)) {
+            return merged;
           }
           return prev;
         });
@@ -53,15 +63,37 @@ const Chat = ({ role = 'user' }) => {
 
   const handleSend = async () => {
     if (!input.trim()) return;
+    
+    const messageText = input.trim();
+    const tempId = `temp-${Date.now()}`;
+    const optimisticMessage = {
+      sender: role,
+      text: messageText,
+      createdAt: new Date().toISOString(),
+      _tempId: tempId,
+      _sending: true
+    };
+    
+    // Optimistic update - langsung tampilkan di UI
+    setMessages(prev => [...prev, optimisticMessage]);
+    setInput('');
+    
     try {
       console.log('Sending to:', apiUrl('/api/chat'));
-      await axios.post(apiUrl('/api/chat'), { sender: role, text: input.trim(), sessionId });
-      setInput('');
+      const { data } = await axios.post(apiUrl('/api/chat'), { sender: role, text: messageText, sessionId });
+      
+      // Replace temp message with server response
+      setMessages(prev => 
+        prev.map(m => m._tempId === tempId ? { ...data, _sent: true } : m)
+      );
       setError('');
-      fetchMessages();
     } catch (e) {
       console.error('Send error:', e);
       setError(`Gagal mengirim: ${e.message}`);
+      // Mark as failed
+      setMessages(prev => 
+        prev.map(m => m._tempId === tempId ? { ...m, _failed: true, _sending: false } : m)
+      );
     }
   };
 
@@ -89,10 +121,28 @@ const Chat = ({ role = 'user' }) => {
       <div className="flex-1 px-4 py-6 overflow-y-auto">
         <div className="max-w-2xl mx-auto">
           {messages.map((msg, idx) => (
-            <div key={`${msg.createdAt}-${idx}`} className={`mb-4 flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}> 
-              <span className={`px-5 py-3 rounded-2xl shadow-lg text-base ${msg.sender === 'user' ? 'bg-blue-600' : 'bg-purple-700'} `}>
-                {msg.text}
-              </span>
+            <div key={msg._tempId || `${msg.createdAt}-${idx}`} className={`mb-4 flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}> 
+              <div className={`px-5 py-3 rounded-2xl shadow-lg text-base ${
+                msg.sender === 'user' 
+                  ? msg._failed 
+                    ? 'bg-red-600/70' 
+                    : msg._sending 
+                      ? 'bg-blue-600/70' 
+                      : 'bg-blue-600' 
+                  : 'bg-purple-700'
+              }`}>
+                <div className="flex items-start gap-2">
+                  <div className="flex-1">{msg.text}</div>
+                  {msg.sender === 'user' && (
+                    <div className="text-xs mt-0.5">
+                      {msg._sending && <span title="Mengirim...">⏳</span>}
+                      {msg._failed && <span title="Gagal kirim">❌</span>}
+                      {!msg._sending && !msg._failed && <span title="Terkirim">✓</span>}
+                    </div>
+                  )}
+                </div>
+                {msg._failed && <div className="text-xs text-red-200 mt-1">Gagal kirim</div>}
+              </div>
             </div>
           ))}
           <div ref={messagesEndRef} />
