@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Chat from './components/Chat';
 import './App.css';
 import { Navbar } from './components/Navbar';
@@ -46,8 +46,8 @@ function App() {
             <Toaster position="top-right" />
           </div>
         } />
-        <Route path="/admin" element={<AdminDashboard onLogout={() => setAuth(null)} />} />
-        <Route path="/chat" element={<Chat />} />
+        <Route path="/admin" element={isAdmin ? <AdminDashboard onLogout={() => setAuth(null)} /> : <Navigate to="/" replace />} />
+        <Route path="/chat" element={<Chat role={isAdmin ? 'admin' : 'user'} />} />
       </Routes>
     </BrowserRouter>
   );

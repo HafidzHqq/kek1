@@ -1,16 +1,31 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import axios from 'axios';
 
-const Chat = () => {
-  const [messages, setMessages] = useState([
-    { sender: 'admin', text: 'Halo! Silakan tulis pesan Anda di sini.' }
-  ]);
+const Chat = ({ role = 'user' }) => {
+  const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
+  const pollRef = useRef(null);
 
-  const handleSend = () => {
-    if (input.trim() === '') return;
-    setMessages([...messages, { sender: 'user', text: input }]);
-    setInput('');
-    // TODO: Kirim pesan ke backend
+  const fetchMessages = async () => {
+    try {
+      const { data } = await axios.get('/api/chat');
+      if (Array.isArray(data)) setMessages(data);
+    } catch {}
+  };
+
+  useEffect(() => {
+    fetchMessages();
+    pollRef.current = setInterval(fetchMessages, 2500);
+    return () => pollRef.current && clearInterval(pollRef.current);
+  }, []);
+
+  const handleSend = async () => {
+    if (!input.trim()) return;
+    try {
+      await axios.post('/api/chat', { sender: role, text: input.trim() });
+      setInput('');
+      fetchMessages();
+    } catch {}
   };
 
   return (
