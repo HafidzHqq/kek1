@@ -14,6 +14,7 @@ export const Contact = () => {
     subject: '',
     message: '',
   });
+  const navigate = useNavigate();
 
   const [isLoading, setIsLoading] = useState(false);
 
@@ -147,7 +148,7 @@ export const Contact = () => {
           >
             <Card className="bg-gray-900 border-gray-800">
               <CardContent className="p-8">
-                <form onSubmit={handleSubmit} className="space-y-6">
+                <form onSubmit={e => e.preventDefault()} className="space-y-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
                       <label htmlFor="name" className="block text-sm font-medium text-gray-300 mb-2">
@@ -218,12 +219,14 @@ export const Contact = () => {
                   >
                     {isLoading ? 'Sending...' : 'Send Message'}
                     <Send className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
-                  </Button>
-                </form>
+                    type="button"
               </CardContent>
             </Card>
           </motion.div>
-        </div>
+                    onClick={() => navigate('/chat')}
+                    className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-full py-6 text-lg font-semibold group"
+                    >
+                    Send Message
       </div>
     </section>
   );

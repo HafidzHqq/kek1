@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import Chat from './components/Chat';
 import './App.css';
 import { Navbar } from './components/Navbar';
 import { Hero } from './components/Hero';
@@ -25,27 +27,28 @@ function App() {
     }
   }, [auth]);
 
-  if (!auth) {
-    return <AuthMenu onAuth={setAuth} />;
-  }
-
-  if (isAdmin) {
-    return <AdminDashboard />;
-  }
-
   return (
-    <div className="App">
-      <Navbar />
-      <Hero />
-      <Services />
-      <WhyUs />
-      <Portfolio />
-      <Testimonials />
-      <Pricing />
-      <Contact />
-      <Footer />
-      <Toaster position="top-right" />
-    </div>
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={
+          !auth ? <AuthMenu onAuth={setAuth} /> :
+          isAdmin ? <AdminDashboard /> :
+          <div className="App">
+            <Navbar />
+            <Hero />
+            <Services />
+            <WhyUs />
+            <Portfolio />
+            <Testimonials />
+            <Pricing />
+            <Contact />
+            <Footer />
+            <Toaster position="top-right" />
+          </div>
+        } />
+        <Route path="/chat" element={<Chat />} />
+      </Routes>
+    </BrowserRouter>
   );
 }
 
