@@ -1,5 +1,4 @@
 import React, { useState } from "react";
-import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword } from "firebase/auth";
 
 export function AuthMenu({ onAuth }) {
   const [isLogin, setIsLogin] = useState(true);
@@ -12,22 +11,20 @@ export function AuthMenu({ onAuth }) {
     e.preventDefault();
     setError("");
     setLoading(true);
-    const auth = getAuth();
     if (!isLogin && password.length < 6) {
       setError("Password minimal 6 karakter.");
       setLoading(false);
       return;
     }
-    try {
-      if (isLogin) {
-        await signInWithEmailAndPassword(auth, email, password);
-        onAuth("login");
+    // Dummy login/register
+    if (isLogin) {
+      if (email === "gegefans0@gmail.com" && password === "admin123") {
+        onAuth("admin");
       } else {
-        await createUserWithEmailAndPassword(auth, email, password);
-        onAuth("register");
+        onAuth("user");
       }
-    } catch (err) {
-      setError(err.message);
+    } else {
+      onAuth("user");
     }
     setLoading(false);
   };

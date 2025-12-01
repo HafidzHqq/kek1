@@ -12,22 +12,17 @@ import { Footer } from './components/Footer';
 import { Toaster } from './components/ui/sonner';
 import { AuthMenu } from './components/AuthMenu';
 import { AdminDashboard } from './components/AdminDashboard';
-import './firebase';
-import { getAuth } from "firebase/auth";
 
 function App() {
   const [auth, setAuth] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);
 
   React.useEffect(() => {
-    const unsubscribe = getAuth().onAuthStateChanged((user) => {
-      if (user && user.email === "gegefans0@gmail.com") {
-        setIsAdmin(true);
-      } else {
-        setIsAdmin(false);
-      }
-    });
-    return () => unsubscribe();
+    if (auth && auth === "admin") {
+      setIsAdmin(true);
+    } else {
+      setIsAdmin(false);
+    }
   }, [auth]);
 
   if (!auth) {
