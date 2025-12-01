@@ -34,7 +34,7 @@ function App() {
           !auth ? <AuthMenu onAuth={setAuth} /> :
           isAdmin ? <AdminDashboard onLogout={() => setAuth(null)} /> :
           <div className="App">
-            <Navbar />
+            <Navbar showDashboard={isAdmin} />
             <Hero />
             <Services />
             <WhyUs />
