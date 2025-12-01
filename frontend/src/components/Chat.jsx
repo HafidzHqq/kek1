@@ -2,11 +2,16 @@ import React, { useEffect, useRef, useState } from 'react';
 import axios from 'axios';
 import { apiUrl, API_BASE } from '../lib/api';
 
-const Chat = ({ role = 'user' }) => {
+const Chat = ({ role = 'user', userEmail }) => {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [error, setError] = useState('');
   const [sessionId] = useState(() => {
+    // Use email as sessionId if available, fallback to random
+    if (userEmail) {
+      // Encode email: test@example.com -> email_test_at_example_dot_com
+      return `email_${userEmail.replace(/@/g, '_at_').replace(/\./g, '_dot_')}`;
+    }
     let id = localStorage.getItem('chatSessionId');
     if (!id) {
       id = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
@@ -17,6 +22,7 @@ const Chat = ({ role = 'user' }) => {
   const pollRef = useRef(null);
   const messagesEndRef = useRef(null);
   const lastHashRef = useRef('');
+  const emailRef = useRef(userEmail);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -123,7 +129,10 @@ const Chat = ({ role = 'user' }) => {
             <div className="text-xs text-gray-400">Online</div>
           </div>
         </div>
-        <div className="text-purple-400 font-semibold">Live Chat</div>
+        <div className="text-right">
+          <div className="text-purple-400 font-semibold">Live Chat</div>
+          {userEmail && <div className="text-xs text-gray-400">{userEmail}</div>}
+        </div>
       </div>
       {/* Info error */}
       {error && (

@@ -19,12 +19,12 @@ export function AuthMenu({ onAuth }) {
     // Dummy login/register
     if (isLogin) {
       if (email === "gegefans0@gmail.com" && password === "admin123") {
-        onAuth("admin");
+        onAuth({ role: "admin", email: email });
       } else {
-        onAuth("user");
+        onAuth({ role: "user", email: email });
       }
     } else {
-      onAuth("user");
+      onAuth({ role: "user", email: email });
     }
     setLoading(false);
   };

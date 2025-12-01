@@ -2,6 +2,14 @@ import React, { useEffect, useMemo, useState, useRef } from "react";
 import { LayoutDashboard, MessageSquare, Users, Settings, LogOut, Mail, UserCircle2, Clock } from "lucide-react";
 import { apiUrl } from '../lib/api';
 
+// Helper function to decode email from sessionId
+const decodeEmail = (sessionId) => {
+  if (sessionId.startsWith('email_')) {
+    return sessionId.replace('email_', '').replace(/_at_/g, '@').replace(/_dot_/g, '.').replace(/_/g, '.');
+  }
+  return `User ${sessionId.substring(0, 12)}`;
+};
+
 export function AdminDashboard({ onLogout }) {
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -270,7 +278,7 @@ export function AdminDashboard({ onLogout }) {
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between gap-2 mb-1">
-                            <div className="font-medium text-sm truncate">User {conv.sessionId.substring(5, 15)}</div>
+                            <div className="font-medium text-sm truncate">{decodeEmail(conv.sessionId)}</div>
                             {conv.unread > 0 && (
                               <span className="bg-red-500 text-xs px-1.5 py-0.5 rounded-full">{conv.unread}</span>
                             )}
@@ -289,7 +297,7 @@ export function AdminDashboard({ onLogout }) {
               {/* Ruang Chat */}
               <div className="lg:col-span-2 bg-white/5 rounded-xl border border-white/10 flex flex-col min-h-[60vh]">
                 <div className="px-4 py-3 border-b border-white/10 font-semibold">
-                  {selectedSession ? `Chat dengan User ${selectedSession.substring(5, 15)}` : 'Pilih Chat'}
+                  {selectedSession ? `Chat dengan ${decodeEmail(selectedSession)}` : 'Pilih Chat'}
                 </div>
                 <div className="flex-1 p-4 space-y-3 overflow-y-auto">
                   {!selectedSession ? (
