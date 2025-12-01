@@ -16,6 +16,7 @@ const Chat = ({ role = 'user' }) => {
   });
   const pollRef = useRef(null);
   const messagesEndRef = useRef(null);
+  const lastHashRef = useRef('');
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -27,31 +28,37 @@ const Chat = ({ role = 'user' }) => {
 
   const fetchMessages = async () => {
     try {
-      console.log('Fetching from:', apiUrl(`/api/chat?sessionId=${sessionId}`));
       const { data } = await axios.get(apiUrl(`/api/chat?sessionId=${sessionId}`));
       if (Array.isArray(data)) {
-        setMessages(prev => {
-          // Create a map of existing messages by createdAt
-          const existingMap = new Map();
-          prev.forEach(m => {
-            if (m.createdAt) existingMap.set(m.createdAt, m);
+        const currentHash = JSON.stringify(data.map(m => ({ t: m.createdAt, s: m.sender })));
+        
+        // Only update if messages actually changed
+        if (currentHash !== lastHashRef.current) {
+          lastHashRef.current = currentHash;
+          
+          setMessages(prev => {
+            // Create a map of existing messages by createdAt
+            const existingMap = new Map();
+            prev.forEach(m => {
+              if (m.createdAt) existingMap.set(m.createdAt, m);
+            });
+            
+            // Add server messages to map (server is source of truth)
+            data.forEach(m => {
+              existingMap.set(m.createdAt, m);
+            });
+            
+            // Keep temp messages that are still sending or failed
+            const tempMessages = prev.filter(m => m._tempId && (m._sending || m._failed));
+            
+            // Combine: confirmed messages + temp messages
+            const result = [...existingMap.values(), ...tempMessages].sort((a, b) => 
+              new Date(a.createdAt) - new Date(b.createdAt)
+            );
+            
+            return result;
           });
-          
-          // Add server messages to map (server is source of truth)
-          data.forEach(m => {
-            existingMap.set(m.createdAt, m);
-          });
-          
-          // Keep temp messages that are still sending or failed
-          const tempMessages = prev.filter(m => m._tempId && (m._sending || m._failed));
-          
-          // Combine: confirmed messages + temp messages
-          const result = [...existingMap.values(), ...tempMessages].sort((a, b) => 
-            new Date(a.createdAt) - new Date(b.createdAt)
-          );
-          
-          return result;
-        });
+        }
       }
       setError('');
     } catch (e) {
@@ -62,7 +69,7 @@ const Chat = ({ role = 'user' }) => {
 
   useEffect(() => {
     fetchMessages();
-    pollRef.current = setInterval(fetchMessages, 2500);
+    pollRef.current = setInterval(fetchMessages, 3000); // Increase from 2.5s to 3s
     return () => pollRef.current && clearInterval(pollRef.current);
   }, []);
 
@@ -84,13 +91,14 @@ const Chat = ({ role = 'user' }) => {
     setInput('');
     
     try {
-      console.log('Sending to:', apiUrl('/api/chat'));
       const { data } = await axios.post(apiUrl('/api/chat'), { sender: role, text: messageText, sessionId });
       
       // Replace temp message with server response
       setMessages(prev => 
         prev.map(m => m._tempId === tempId ? { ...data, _sent: true } : m)
       );
+      // Force refresh hash to trigger next poll update
+      lastHashRef.current = '';
       setError('');
     } catch (e) {
       console.error('Send error:', e);

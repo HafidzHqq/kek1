@@ -12,6 +12,8 @@ export function AdminDashboard({ onLogout }) {
   const [chatInput, setChatInput] = useState("");
   const chatEndRef = useRef(null);
   const hasAutoSelected = useRef(false);
+  const lastConversationsHash = useRef('');
+  const lastMessagesHash = useRef('');
 
   const scrollToBottom = () => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -34,18 +36,26 @@ export function AdminDashboard({ onLogout }) {
 
   // Polling untuk daftar conversations
   useEffect(() => {
+    if (active !== 'chat') return; // Only poll when chat tab is active
+    
     let timer;
     const fetchConversations = async () => {
       try {
         const res = await fetch(apiUrl('/api/chat'));
         const data = await res.json();
         if (data.conversations) {
-          setConversations(data.conversations);
+          const currentHash = JSON.stringify(data.conversations.map(c => ({ id: c.sessionId, count: c.messageCount, last: c.timestamp })));
           
-          // Auto-select first conversation only once
-          if (!hasAutoSelected.current && !selectedSession && data.conversations.length > 0) {
-            setSelectedSession(data.conversations[0].sessionId);
-            hasAutoSelected.current = true;
+          // Only update if actually changed
+          if (currentHash !== lastConversationsHash.current) {
+            lastConversationsHash.current = currentHash;
+            setConversations(data.conversations);
+            
+            // Auto-select first conversation only once
+            if (!hasAutoSelected.current && !selectedSession && data.conversations.length > 0) {
+              setSelectedSession(data.conversations[0].sessionId);
+              hasAutoSelected.current = true;
+            }
           }
         }
       } catch (e) {
@@ -53,13 +63,13 @@ export function AdminDashboard({ onLogout }) {
       }
     };
     fetchConversations();
-    timer = setInterval(fetchConversations, 3000);
+    timer = setInterval(fetchConversations, 5000); // Increase from 3s to 5s
     return () => clearInterval(timer);
-  }, [selectedSession]);
+  }, [selectedSession, active]);
 
   // Polling untuk chat messages dari selected session
   useEffect(() => {
-    if (!selectedSession) return;
+    if (!selectedSession || active !== 'chat') return;
     let timer;
     let isMounted = true;
     
@@ -68,40 +78,47 @@ export function AdminDashboard({ onLogout }) {
         const res = await fetch(apiUrl(`/api/chat?sessionId=${selectedSession}`));
         const data = await res.json();
         if (Array.isArray(data) && isMounted) {
-          setChatMessages(prev => {
-            // Create a map of existing messages by createdAt
-            const existingMap = new Map();
-            prev.forEach(m => {
-              if (m.createdAt) existingMap.set(m.createdAt, m);
+          const currentHash = JSON.stringify(data.map(m => ({ t: m.createdAt, s: m.sender })));
+          
+          // Only update if messages actually changed
+          if (currentHash !== lastMessagesHash.current) {
+            lastMessagesHash.current = currentHash;
+            
+            setChatMessages(prev => {
+              // Create a map of existing messages by createdAt
+              const existingMap = new Map();
+              prev.forEach(m => {
+                if (m.createdAt) existingMap.set(m.createdAt, m);
+              });
+              
+              // Add server messages to map (server is source of truth for sent messages)
+              data.forEach(m => {
+                existingMap.set(m.createdAt, m);
+              });
+              
+              // Keep temp messages that are still sending or failed
+              const tempMessages = prev.filter(m => m._tempId && (m._sending || m._failed));
+              
+              // Combine: confirmed messages + temp messages
+              const result = [...existingMap.values(), ...tempMessages].sort((a, b) => 
+                new Date(a.createdAt) - new Date(b.createdAt)
+              );
+              
+              return result;
             });
-            
-            // Add server messages to map (server is source of truth for sent messages)
-            data.forEach(m => {
-              existingMap.set(m.createdAt, m);
-            });
-            
-            // Keep temp messages that are still sending or failed
-            const tempMessages = prev.filter(m => m._tempId && (m._sending || m._failed));
-            
-            // Combine: confirmed messages + temp messages
-            const result = [...existingMap.values(), ...tempMessages].sort((a, b) => 
-              new Date(a.createdAt) - new Date(b.createdAt)
-            );
-            
-            return result;
-          });
+          }
         }
       } catch (e) {
         console.error('Error fetching chat:', e);
       }
     };
     fetchChat();
-    timer = setInterval(fetchChat, 2500);
+    timer = setInterval(fetchChat, 3000); // Increase from 2.5s to 3s
     return () => {
       isMounted = false;
       clearInterval(timer);
     };
-  }, [selectedSession]);
+  }, [selectedSession, active]);
 
   const sendChat = async () => {
     if (!chatInput.trim() || !selectedSession) return;
@@ -116,14 +133,8 @@ export function AdminDashboard({ onLogout }) {
       _sending: true
     };
     
-    console.log('Sending message:', optimisticMessage);
-    
     // Optimistic update - langsung tampilkan di UI
-    setChatMessages(prev => {
-      const newMessages = [...prev, optimisticMessage];
-      console.log('Messages after optimistic update:', newMessages.length);
-      return newMessages;
-    });
+    setChatMessages(prev => [...prev, optimisticMessage]);
     setChatInput('');
     
     try {
@@ -136,22 +147,19 @@ export function AdminDashboard({ onLogout }) {
       if (res.ok) {
         // Replace temp message with server response
         const serverMessage = await res.json();
-        console.log('Server response:', serverMessage);
-        setChatMessages(prev => {
-          const updated = prev.map(m => m._tempId === tempId ? { ...serverMessage, _sent: true } : m);
-          console.log('Messages after server confirm:', updated.length);
-          return updated;
-        });
+        setChatMessages(prev => 
+          prev.map(m => m._tempId === tempId ? { ...serverMessage, _sent: true } : m)
+        );
+        // Force refresh hash to trigger next poll update
+        lastMessagesHash.current = '';
       } else {
         console.error('Send failed with status:', res.status);
-        // Mark as failed
         setChatMessages(prev => 
           prev.map(m => m._tempId === tempId ? { ...m, _failed: true, _sending: false } : m)
         );
       }
     } catch (e) {
       console.error('Error sending chat:', e);
-      // Mark as failed
       setChatMessages(prev => 
         prev.map(m => m._tempId === tempId ? { ...m, _failed: true, _sending: false } : m)
       );
