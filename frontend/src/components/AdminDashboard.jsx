@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { LayoutDashboard, MessageSquare, Users, Settings, LogOut, Mail, UserCircle2 } from "lucide-react";
+import { apiUrl } from '../lib/api';
 
 export function AdminDashboard({ onLogout }) {
   const [messages, setMessages] = useState([]);
@@ -10,7 +11,7 @@ export function AdminDashboard({ onLogout }) {
 
   useEffect(() => {
     // Dummy fetch; ganti dengan API nyata jika tersedia
-    fetch("/api/contact")
+    fetch(apiUrl("/api/contact"))
       .then((res) => res.ok ? res.json() : [])
       .then((data) => {
         setMessages(Array.isArray(data) ? data : []);
@@ -24,7 +25,7 @@ export function AdminDashboard({ onLogout }) {
     let timer;
     const fetchChat = async () => {
       try {
-        const res = await fetch('/api/chat');
+        const res = await fetch(apiUrl('/api/chat'));
         const data = await res.json();
         if (Array.isArray(data)) setChatMessages(data);
       } catch {}
@@ -37,7 +38,7 @@ export function AdminDashboard({ onLogout }) {
   const sendChat = async () => {
     if (!chatInput.trim()) return;
     try {
-      await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sender: 'admin', text: chatInput.trim() }) });
+      await fetch(apiUrl('/api/chat'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sender: 'admin', text: chatInput.trim() }) });
       setChatInput('');
     } catch {}
   };

@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import axios from 'axios';
+import { apiUrl } from '../lib/api';
 
 const Chat = ({ role = 'user' }) => {
   const [messages, setMessages] = useState([]);
@@ -8,7 +9,7 @@ const Chat = ({ role = 'user' }) => {
 
   const fetchMessages = async () => {
     try {
-      const { data } = await axios.get('/api/chat');
+      const { data } = await axios.get(apiUrl('/api/chat'));
       if (Array.isArray(data)) setMessages(data);
     } catch {}
   };
@@ -22,7 +23,7 @@ const Chat = ({ role = 'user' }) => {
   const handleSend = async () => {
     if (!input.trim()) return;
     try {
-      await axios.post('/api/chat', { sender: role, text: input.trim() });
+      await axios.post(apiUrl('/api/chat'), { sender: role, text: input.trim() });
       setInput('');
       fetchMessages();
     } catch {}
