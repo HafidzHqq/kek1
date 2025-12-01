@@ -32,7 +32,7 @@ function App() {
       <Routes>
         <Route path="/" element={
           !auth ? <AuthMenu onAuth={setAuth} /> :
-          isAdmin ? <AdminDashboard /> :
+          isAdmin ? <AdminDashboard onLogout={() => setAuth(null)} /> :
           <div className="App">
             <Navbar />
             <Hero />
@@ -46,6 +46,7 @@ function App() {
             <Toaster position="top-right" />
           </div>
         } />
+        <Route path="/admin" element={<AdminDashboard onLogout={() => setAuth(null)} />} />
         <Route path="/chat" element={<Chat />} />
       </Routes>
     </BrowserRouter>
