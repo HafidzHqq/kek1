@@ -11,92 +11,28 @@ export const Contact = () => {
   const [formData, setFormData] = useState({
     name: '',
     email: '',
-    subject: '',
-    message: '',
-  });
-  const navigate = useNavigate();
-
-  const [isLoading, setIsLoading] = useState(false);
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setIsLoading(true);
-
-    try {
-      const response = await fetch('http://127.0.0.1:8000/api/contact', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(formData),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to send message');
-      }
-
-      toast.success('Message sent successfully! We\'ll get back to you soon.');
-      setFormData({ name: '', email: '', subject: '', message: '' });
-    } catch (error) {
-      console.error('Error sending message:', error);
-      toast.error('Failed to send message. Please try again.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-  };
-
-  const contactInfo = [
-    {
-      icon: Mail,
-      title: 'Email',
-      content: 'inovatechstudio@gmail.com',
-      link: 'inovatechstudio@gmail.com',
-    },
-    {
-      icon: Phone,
-      title: 'Phone',
-      content: '+6285840409283',
-      link: '+6285840409283',
-    },
-    {
-      icon: MapPin,
-      title: 'Location',
-      content: 'Bandar lampung, Lampung, Indonesia',
-      link: null,
-    },
-  ];
-
-  return (
-    <section id="contact" className="py-24 bg-black">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Section Header */}
-        <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.6 }}
-          className="text-center mb-16"
-        >
-          <h2 className="text-4xl md:text-5xl font-bold text-white mb-4">
-            Get In <span className="bg-gradient-to-r from-blue-500 to-purple-600 bg-clip-text text-transparent">Touch</span>
-          </h2>
-          <p className="text-gray-400 text-lg max-w-2xl mx-auto">
-            Ready to start your project? Contact us today and let's create something amazing together
-          </p>
-        </motion.div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Contact Info */}
+          {/* Tombol Kirim Pesan ke Admin */}
           <motion.div
-            initial={{ opacity: 0, x: -30 }}
+            initial={{ opacity: 0, x: 30 }}
             whileInView={{ opacity: 1, x: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.6 }}
-            className="space-y-6"
+            className="lg:col-span-2 flex items-center justify-center"
+          >
+            <Card className="bg-gray-900 border-gray-800 w-full max-w-lg mx-auto">
+              <CardContent className="p-8 flex flex-col items-center">
+                <h3 className="text-white font-bold text-xl mb-4 text-center">Ingin chat langsung dengan admin?</h3>
+                <Button
+                  type="button"
+                  className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-full py-6 text-lg font-semibold flex items-center justify-center"
+                  onClick={() => navigate('/chat')}
+                >
+                  Kirim Pesan ke Admin
+                  <Send className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                </Button>
+              </CardContent>
+            </Card>
+          </motion.div>
           >
             {contactInfo.map((info, index) => (
               <Card
