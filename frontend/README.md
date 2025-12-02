@@ -1,3 +1,14 @@
+# Queue-Based Chat (Upstash Redis)
+
+This app's `/api/chat` backend now uses a queue-based message delivery built on Redis Streams (via Upstash). If Redis credentials are not provided, it transparently falls back to the previous temporary file storage.
+
+Environment variables to set (in Vercel Project Settings → Environment Variables):
+
+- `UPSTASH_REDIS_REST_URL` – Upstash REST URL
+- `UPSTASH_REDIS_REST_TOKEN` – Upstash REST Token
+
+With these set, messages are appended to per-session streams and conversation metadata is maintained in Redis.
+
 # Getting Started with Create React App
 
 This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).

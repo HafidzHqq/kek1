@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { getRedis } = require('./_redis');
 
 const DATA_FILE = path.join('/tmp', 'chat-data.json');
 
@@ -27,75 +28,193 @@ function saveMessages(data) {
 
 let chatData = loadMessages();
 
+// Redis keys
+const STREAM_PREFIX = 'chat:stream:'; // per-session stream
+const SESSIONS_KEY = 'chat:sessions'; // set of all sessionIds
+const CONV_PREFIX = 'chat:conv:'; // per-session conversation hash
+
 function setCors(res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,DELETE,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 }
 
-export default function handler(req, res) {
+export default async function handler(req, res) {
   setCors(res);
   if (req.method === 'OPTIONS') return res.status(200).end();
 
-  if (req.method === 'GET') {
-    const { sessionId } = req.query;
-    if (sessionId) {
-      // Get messages for specific session
-      const messages = chatData.conversations[sessionId] || [];
-      return res.status(200).json(messages);
+  const redis = await getRedis();
+
+  // Helper: fallback to file-based storage when Redis isn't configured
+  async function handleWithFileStorage() {
+    if (req.method === 'GET') {
+      const { sessionId } = req.query;
+      if (sessionId) {
+        const messages = chatData.conversations[sessionId] || [];
+        return res.status(200).json(messages);
+      }
+      return res.status(200).json({
+        conversations: Object.keys(chatData.conversations)
+          .map((id) => {
+            const msgs = chatData.conversations[id] || [];
+            const lastMsg = msgs[msgs.length - 1];
+            return {
+              sessionId: id,
+              lastMessage: lastMsg?.text || '',
+              lastSender: lastMsg?.sender || 'user',
+              timestamp: lastMsg?.createdAt || new Date().toISOString(),
+              unread: msgs.filter((m) => m.sender === 'user' && !m.read).length,
+              messageCount: msgs.length,
+            };
+          })
+          .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)),
+      });
     }
-    // Get all conversations list
-    return res.status(200).json({
-      conversations: Object.keys(chatData.conversations).map(id => {
-        const msgs = chatData.conversations[id] || [];
-        const lastMsg = msgs[msgs.length - 1];
-        return {
+
+    if (req.method === 'POST') {
+      const { sender = 'user', text, sessionId } = req.body || {};
+      if (!text || typeof text !== 'string') {
+        return res.status(400).json({ error: 'text required' });
+      }
+      if (!sessionId) {
+        return res.status(400).json({ error: 'sessionId required' });
+      }
+
+      const msg = {
+        sender,
+        text,
+        createdAt: new Date().toISOString(),
+        read: sender === 'admin',
+      };
+
+      if (!chatData.conversations[sessionId]) {
+        chatData.conversations[sessionId] = [];
+      }
+      chatData.conversations[sessionId].push(msg);
+      saveMessages(chatData);
+
+      return res.status(200).json(msg);
+    }
+
+    if (req.method === 'DELETE') {
+      const { sessionId } = req.query;
+      if (sessionId) {
+        delete chatData.conversations[sessionId];
+      } else {
+        chatData = { conversations: {}, messages: [] };
+      }
+      saveMessages(chatData);
+      return res.status(200).json({ ok: true });
+    }
+
+    return res.status(405).end();
+  }
+
+  // If Redis isn't set up, use file fallback
+  if (!redis) {
+    return handleWithFileStorage();
+  }
+
+  // Redis-backed queue (Streams) implementation
+  const toIso = (streamId) => {
+    const ms = Number(String(streamId).split('-')[0] || Date.now());
+    return new Date(ms).toISOString();
+  };
+
+  try {
+    if (req.method === 'GET') {
+      const { sessionId, cursor, limit } = req.query;
+      const count = Math.min(Number(limit) || 100, 200);
+
+      if (sessionId) {
+        const streamKey = `${STREAM_PREFIX}${sessionId}`;
+        // Read messages after a cursor if provided, else recent window
+        const start = cursor ? `(${cursor}` : '-';
+        const entries = await redis.xrange(streamKey, start, '+', {
+          count,
+        });
+
+        const messages = (entries || []).map(([id, fields]) => {
+          const obj = Object.fromEntries(fields);
+          return {
+            id,
+            sender: obj.sender || 'user',
+            text: obj.text || '',
+            createdAt: obj.createdAt || toIso(id),
+          };
+        });
+
+        return res.status(200).json(messages);
+      }
+
+      // Conversations list
+      const sessionIds = (await redis.smembers(SESSIONS_KEY)) || [];
+      const convs = [];
+      for (const id of sessionIds) {
+        const key = `${STREAM_PREFIX}${id}`;
+        const last = await redis.xrevrange(key, '+', '-', { count: 1 });
+        const length = (await redis.xlen(key)) || 0;
+        const [lastId, lastFields] = last?.[0] || [null, []];
+        const lastObj = Object.fromEntries(lastFields || []);
+        convs.push({
           sessionId: id,
-          lastMessage: lastMsg?.text || '',
-          lastSender: lastMsg?.sender || 'user',
-          timestamp: lastMsg?.createdAt || new Date().toISOString(),
-          unread: msgs.filter(m => m.sender === 'user' && !m.read).length,
-          messageCount: msgs.length
-        };
-      }).sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
-    });
-  }
+          lastMessage: lastObj.text || '',
+          lastSender: lastObj.sender || 'user',
+          timestamp: lastObj.createdAt || (lastId ? toIso(lastId) : new Date(0).toISOString()),
+          unread: 0,
+          messageCount: length,
+        });
+      }
+      convs.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+      return res.status(200).json({ conversations: convs });
+    }
 
-  if (req.method === 'POST') {
-    const { sender = 'user', text, sessionId } = req.body || {};
-    if (!text || typeof text !== 'string') {
-      return res.status(400).json({ error: 'text required' });
-    }
-    if (!sessionId) {
-      return res.status(400).json({ error: 'sessionId required' });
-    }
-    
-    const msg = { 
-      sender, 
-      text, 
-      createdAt: new Date().toISOString(),
-      read: sender === 'admin' // admin messages auto-marked read
-    };
-    
-    if (!chatData.conversations[sessionId]) {
-      chatData.conversations[sessionId] = [];
-    }
-    chatData.conversations[sessionId].push(msg);
-    saveMessages(chatData);
-    
-    return res.status(200).json(msg);
-  }
+    if (req.method === 'POST') {
+      const { sender = 'user', text, sessionId } = req.body || {};
+      if (!text || typeof text !== 'string') {
+        return res.status(400).json({ error: 'text required' });
+      }
+      if (!sessionId) {
+        return res.status(400).json({ error: 'sessionId required' });
+      }
 
-  if (req.method === 'DELETE') {
-    const { sessionId } = req.query;
-    if (sessionId) {
-      delete chatData.conversations[sessionId];
-    } else {
-      chatData = { conversations: {}, messages: [] };
-    }
-    saveMessages(chatData);
-    return res.status(200).json({ ok: true });
-  }
+      const streamKey = `${STREAM_PREFIX}${sessionId}`;
+      const createdAt = new Date().toISOString();
+      const id = await redis.xadd(streamKey, '*', {
+        sender,
+        text,
+        createdAt,
+      });
+      await redis.sadd(SESSIONS_KEY, sessionId);
+      await redis.hset(`${CONV_PREFIX}${sessionId}`, {
+        lastMessage: text,
+        lastSender: sender,
+        timestamp: createdAt,
+      });
 
-  return res.status(405).end();
+      return res.status(200).json({ id, sender, text, createdAt });
+    }
+
+    if (req.method === 'DELETE') {
+      const { sessionId } = req.query;
+      if (sessionId) {
+        // Delete a single stream and metadata
+        await redis.del(`${STREAM_PREFIX}${sessionId}`);
+        await redis.hdel(`${CONV_PREFIX}${sessionId}`, 'lastMessage', 'lastSender', 'timestamp');
+        await redis.srem(SESSIONS_KEY, sessionId);
+      } else {
+        const sessionIds = (await redis.smembers(SESSIONS_KEY)) || [];
+        const keys = sessionIds.map((id) => `${STREAM_PREFIX}${id}`);
+        if (keys.length) await redis.del(...keys);
+        await redis.del(SESSIONS_KEY);
+      }
+      return res.status(200).json({ ok: true });
+    }
+
+    return res.status(405).end();
+  } catch (err) {
+    console.error('Chat API (Redis) error:', err);
+    // Fallback on error to file-based to keep UX working
+    return handleWithFileStorage();
+  }
 }
