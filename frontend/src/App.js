@@ -46,14 +46,19 @@ function App() {
             name: data.user.name,
             token
           });
+          setUserEmail(data.user.email);
+          console.log('[App] Session verified for user:', data.user.email);
         } else {
+          console.log('[App] Session verification failed: invalid response');
           localStorage.removeItem('authToken');
           localStorage.removeItem('userEmail');
         }
       } catch (err) {
-        console.error('Session verification failed:', err);
+        console.log('[App] Session verification failed:', err.response?.data?.error || err.message);
+        // Clear invalid token
         localStorage.removeItem('authToken');
         localStorage.removeItem('userEmail');
+        setAuth(null);
       } finally {
         setLoading(false);
       }

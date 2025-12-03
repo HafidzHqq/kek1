@@ -76,8 +76,10 @@ async function loadSessions(redis) {
         for (const [token, json] of Object.entries(data)) {
           sessions[token] = JSON.parse(json);
         }
+        console.log(`[Auth] ✅ Loaded ${Object.keys(sessions).length} sessions from Redis`);
         return sessions;
       }
+      console.log('[Auth] Redis connected but no sessions found');
     } catch (e) {
       console.error('Error loading sessions from Redis:', e);
     }
@@ -85,11 +87,14 @@ async function loadSessions(redis) {
   // Fallback to file
   try {
     if (fs.existsSync(SESSIONS_FILE)) {
-      return JSON.parse(fs.readFileSync(SESSIONS_FILE, 'utf8'));
+      const sessions = JSON.parse(fs.readFileSync(SESSIONS_FILE, 'utf8'));
+      console.log(`[Auth] Loaded ${Object.keys(sessions).length} sessions from file (fallback)`);
+      return sessions;
     }
   } catch (e) {
     console.error('Error loading sessions from file:', e);
   }
+  console.log('[Auth] No sessions found');
   return {};
 }
 
@@ -101,9 +106,12 @@ async function saveSessions(sessions, redis) {
         pipeline.hset(REDIS_SESSIONS_KEY, token, JSON.stringify(session));
       }
       await pipeline.exec();
+      console.log(`[Auth] ✅ Saved ${Object.keys(sessions).length} sessions to Redis`);
     } catch (e) {
       console.error('Error saving sessions to Redis:', e);
     }
+  } else {
+    console.log('[Auth] ⚠️ Redis not available, using file storage only for sessions');
   }
   // Also save to file as backup
   try {
@@ -185,16 +193,20 @@ module.exports = async function handler(req, res) {
   if (req.method === 'POST' && endpoint === '/login') {
     const { email, password } = req.body || {};
     
+    console.log('[Auth] Login attempt for email:', email);
+    
     if (!email || !password) {
       return res.status(400).json({ error: 'Email dan password wajib diisi' });
     }
     
     const user = users[email];
     if (!user) {
+      console.log('[Auth] Login failed: user not found');
       return res.status(401).json({ error: 'Email atau password salah' });
     }
     
     if (!verifyPassword(password, user.passwordHash)) {
+      console.log('[Auth] Login failed: wrong password');
       return res.status(401).json({ error: 'Email atau password salah' });
     }
     
@@ -206,6 +218,8 @@ module.exports = async function handler(req, res) {
       expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
     };
     await saveSessions(sessions, redis);
+    
+    console.log('[Auth] Login successful for:', email, 'Token:', token.substring(0, 10) + '...');
     
     return res.status(200).json({
       success: true,
@@ -219,16 +233,21 @@ module.exports = async function handler(req, res) {
     const authHeader = req.headers.authorization || '';
     const token = authHeader.replace('Bearer ', '');
     
+    console.log('[Auth] Verify request, token:', token ? token.substring(0, 10) + '...' : 'none');
+    console.log('[Auth] Available sessions:', Object.keys(sessions).length);
+    
     if (!token) {
       return res.status(401).json({ error: 'Token tidak ditemukan' });
     }
     
     const session = sessions[token];
     if (!session) {
+      console.log('[Auth] Session not found for token');
       return res.status(401).json({ error: 'Session tidak valid' });
     }
     
     if (new Date(session.expiresAt) < new Date()) {
+      console.log('[Auth] Session expired');
       delete sessions[token];
       if (redis) {
         await redis.hdel(REDIS_SESSIONS_KEY, token);
@@ -239,9 +258,11 @@ module.exports = async function handler(req, res) {
     
     const user = users[session.email];
     if (!user) {
+      console.log('[Auth] User not found:', session.email);
       return res.status(401).json({ error: 'User tidak ditemukan' });
     }
     
+    console.log('[Auth] Session valid for user:', user.email);
     return res.status(200).json({
       success: true,
       user: { email: user.email, name: user.name, role: user.role }
