@@ -153,25 +153,41 @@ export default async function handler(req, res) {
         let entries;
         try {
           entries = await redis.xrange(streamKey, '-', '+');
-          console.log('[Chat API] xrange returned:', entries ? entries.length : 0, 'entries');
-          console.log('[Chat API] Raw entries:', JSON.stringify(entries));
+          console.log('[Chat API] xrange returned type:', typeof entries, Array.isArray(entries));
+          console.log('[Chat API] Raw entries:', JSON.stringify(entries).substring(0, 200));
         } catch (e) {
           console.error('[Chat API] Error reading stream:', e.message);
           console.log('[Chat API] Falling back to file storage');
           return handleWithFileStorage();
         }
 
-        const messages = (entries || []).map(([id, fields]) => {
-          const obj = Object.fromEntries(fields);
-          return {
-            id,
-            sender: obj.sender || 'user',
-            text: obj.text || '',
-            createdAt: obj.createdAt || toIso(id),
-          };
-        });
+        // Handle different response formats from Upstash
+        let messages = [];
+        
+        if (Array.isArray(entries)) {
+          // Standard Redis format: [[id, [field, value, ...]], ...]
+          messages = entries.map(([id, fields]) => {
+            const obj = Array.isArray(fields) ? Object.fromEntries(
+              fields.reduce((acc, val, idx, arr) => {
+                if (idx % 2 === 0) acc.push([val, arr[idx + 1]]);
+                return acc;
+              }, [])
+            ) : fields;
+            
+            return {
+              id,
+              sender: obj.sender || 'user',
+              text: obj.text || '',
+              createdAt: obj.createdAt || toIso(id),
+            };
+          });
+        } else if (entries && typeof entries === 'object') {
+          // Alternative format - try to extract data
+          console.log('[Chat API] Non-array response, attempting to parse');
+          messages = [];
+        }
 
-        console.log('[Chat API] Returning', messages.length, 'messages for', sessionId);
+        console.log('[Chat API] Parsed', messages.length, 'messages for', sessionId);
         return res.status(200).json(messages);
       }
 
@@ -187,18 +203,25 @@ export default async function handler(req, res) {
           const last = await redis.xrevrange(key, '+', '-');
           const length = (await redis.xlen(key)) || 0;
           
-          // Take first item (most recent)
-          const [lastId, lastFields] = last?.[0] || [null, []];
-          const lastObj = Object.fromEntries(lastFields || []);
-          
-          convs.push({
-            sessionId: id,
-            lastMessage: lastObj.text || '',
-            lastSender: lastObj.sender || 'user',
-            timestamp: lastObj.createdAt || (lastId ? toIso(lastId) : new Date(0).toISOString()),
-            unread: 0,
-            messageCount: length,
-          });
+          // Handle array response  
+          if (Array.isArray(last) && last.length > 0) {
+            const [lastId, lastFields] = last[0];
+            const lastObj = Array.isArray(lastFields) ? Object.fromEntries(
+              lastFields.reduce((acc, val, idx, arr) => {
+                if (idx % 2 === 0) acc.push([val, arr[idx + 1]]);
+                return acc;
+              }, [])
+            ) : (lastFields || {});
+            
+            convs.push({
+              sessionId: id,
+              lastMessage: lastObj.text || '',
+              lastSender: lastObj.sender || 'user',
+              timestamp: lastObj.createdAt || (lastId ? toIso(lastId) : new Date(0).toISOString()),
+              unread: 0,
+              messageCount: length,
+            });
+          }
         } catch (e) {
           console.error('[Chat API] Error reading stream for', id, ':', e);
         }
