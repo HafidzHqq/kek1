@@ -27,12 +27,18 @@ Setelah database dibuat, scroll ke bawah ke bagian **REST API**:
 1. Buka dashboard Vercel: **https://vercel.com**
 2. Pilih project **kek1**
 3. Klik **Settings** → **Environment Variables**
-4. Tambahkan 2 variable:
+4. Tambahkan variable:
 
+**OPSI A: Redis Labs (Recommended - Sudah Ada):**
 | Name | Value |
 |------|-------|
-| `UPSTASH_REDIS_REST_URL` | `https://xxx.upstash.io` (paste dari Upstash) |
-| `UPSTASH_REDIS_REST_TOKEN` | `AxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxA` (paste dari Upstash) |
+| `REDIS_URL` | `redis://default:jenbs16mW1bjclUQlKP36oNuulzcP7Cc@redis-11507.crce194.ap-seast-1-1.ec2.cloud.redislabs.com:11507` |
+
+**OPSI B: Upstash (Alternatif):**
+| Name | Value |
+|------|-------|
+| `UPSTASH_REDIS_REST_URL` | `https://xxx.upstash.io` (dari dashboard Upstash) |
+| `UPSTASH_REDIS_REST_TOKEN` | `AxxxxxxxxxxxA` (dari dashboard Upstash) |
 
 5. **Environment**: Pilih **Production**, **Preview**, **Development** (centang semua)
 6. Klik **Save**
