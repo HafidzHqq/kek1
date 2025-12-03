@@ -255,6 +255,33 @@ export default async function handler(req, res) {
       }
     }
 
+    // LOGOUT (invalidate session token)
+    if (action === 'logout' && req.method === 'POST') {
+      const authHeader = req.headers.authorization;
+      const token = authHeader?.replace('Bearer ', '');
+
+      // Idempotent: treat missing token as success
+      if (!token) {
+        return res.status(200).json({ success: true });
+      }
+
+      if (driver === 'postgres') {
+        await authPG.deleteSession(token);
+        return res.status(200).json({ success: true });
+      } else if (driver === 'mysql') {
+        await authMySQL.deleteSession(token);
+        return res.status(200).json({ success: true });
+      } else {
+        // File storage fallback
+        const sessions = loadSessionsFile();
+        if (sessions[token]) {
+          delete sessions[token];
+          saveSessionsFile(sessions);
+        }
+        return res.status(200).json({ success: true });
+      }
+    }
+
     // GET USERS (admin only)
     if (action === 'users' && req.method === 'GET') {
       const authHeader = req.headers.authorization;

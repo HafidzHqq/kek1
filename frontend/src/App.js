@@ -35,19 +35,21 @@ function App() {
       }
 
       try {
-        const { data } = await axios.get(apiUrl('/api/auth-v2/verify'), {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+        const { data } = await axios.post(
+          apiUrl('/api/auth-v2/verify'),
+          {},
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
 
-        if (data.success && data.user) {
+        if (data.valid && data.email) {
           setAuth({
-            role: data.user.role,
-            email: data.user.email,
-            name: data.user.name,
+            role: data.role,
+            email: data.email,
+            name: data.email,
             token
           });
-          setUserEmail(data.user.email);
-          console.log('[App] Session verified for user:', data.user.email);
+          setUserEmail(data.email);
+          console.log('[App] Session verified for user:', data.email);
         } else {
           console.log('[App] Session verification failed: invalid response');
           localStorage.removeItem('authToken');
@@ -91,7 +93,7 @@ function App() {
     const token = localStorage.getItem('authToken');
     if (token) {
       try {
-        await axios.post(apiUrl('/api/auth/logout'), {}, {
+        await axios.post(apiUrl('/api/auth-v2/logout'), {}, {
           headers: { Authorization: `Bearer ${token}` }
         });
       } catch (err) {
