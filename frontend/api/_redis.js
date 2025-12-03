@@ -2,6 +2,12 @@
 let redisClientPromise = null;
 
 async function getRedis() {
+  // TEMPORARY: Force disable Redis due to compatibility issues with Upstash xrange format
+  // Chat will use file storage in /tmp (data lost on redeploy, but functional)
+  console.log('[Redis] DISABLED - using file storage fallback');
+  return null;
+  
+  /* ORIGINAL CODE - Uncomment when Redis issues are resolved
   if (redisClientPromise) return redisClientPromise;
   
   // Support Upstash REST API format (recommended)
@@ -28,6 +34,7 @@ async function getRedis() {
   }
   
   return null; // Use file storage fallback
+  */
 }
 
 module.exports = { getRedis };
