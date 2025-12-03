@@ -2,6 +2,9 @@
   "name": "kek1",
   "version": "1.0.0",
   "private": true,
+  "engines": {
+    "node": "24.x"
+  },
   "scripts": {
     "install-frontend": "cd frontend && npm install",
     "build": "cd frontend && npm install && npm run build"
