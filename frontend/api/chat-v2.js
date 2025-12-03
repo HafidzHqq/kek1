@@ -1,4 +1,6 @@
-// Universal chat API - auto-detects MySQL or falls back to file storage
+// Universal chat API - auto-detects Postgres, then MySQL, else falls back to file storage
+const pgDb = require('./_pg');
+const chatPG = require('./_chat_pg');
 const { getPool } = require('./_mysql');
 const chatMySQL = require('./_chat_mysql');
 const fs = require('fs');
@@ -37,9 +39,12 @@ export default async function handler(req, res) {
   setCors(res);
   if (req.method === 'OPTIONS') return res.status(200).end();
 
-  const db = await getPool();
-  const useMySQL = !!db;
-  console.log(`[Chat] Using ${useMySQL ? 'MySQL 💾' : 'File Storage 📂'}`);
+  // prefer Postgres, else MySQL, else file
+  let driver = 'file';
+  const pgPool = await pgDb.getPool();
+  if (pgPool) driver = 'postgres';
+  else if (await getPool()) driver = 'mysql';
+  console.log(`[Chat] Using ${driver === 'postgres' ? 'Postgres 🐘' : driver === 'mysql' ? 'MySQL 💾' : 'File Storage 📂'}`);
 
   try {
     // GET - Retrieve messages
@@ -48,7 +53,10 @@ export default async function handler(req, res) {
 
       if (sessionId) {
         // Get messages for specific session
-        if (useMySQL) {
+        if (driver === 'postgres') {
+          const messages = await chatPG.getMessages(sessionId);
+          return res.status(200).json(messages);
+        } else if (driver === 'mysql') {
           const messages = await chatMySQL.getMessages(sessionId);
           return res.status(200).json(messages);
         } else {
@@ -60,7 +68,10 @@ export default async function handler(req, res) {
         }
       } else {
         // Get all conversations
-        if (useMySQL) {
+        if (driver === 'postgres') {
+          const conversations = await chatPG.getConversations();
+          return res.status(200).json({ conversations });
+        } else if (driver === 'mysql') {
           const conversations = await chatMySQL.getConversations();
           return res.status(200).json({ conversations });
         } else {
@@ -97,7 +108,13 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'sessionId required' });
       }
 
-      if (useMySQL) {
+      if (driver === 'postgres') {
+        const message = await chatPG.saveMessage(sessionId, sender, text);
+        if (!message) {
+          return res.status(500).json({ error: 'Failed to save message' });
+        }
+        return res.status(200).json(message);
+      } else if (driver === 'mysql') {
         const message = await chatMySQL.saveMessage(sessionId, sender, text);
         if (!message) {
           return res.status(500).json({ error: 'Failed to save message' });
@@ -130,7 +147,10 @@ export default async function handler(req, res) {
     if (req.method === 'DELETE') {
       const { sessionId } = req.query;
 
-      if (useMySQL) {
+      if (driver === 'postgres') {
+        await chatPG.deleteMessages(sessionId || null);
+        return res.status(200).json({ ok: true });
+      } else if (driver === 'mysql') {
         await chatMySQL.deleteMessages(sessionId || null);
         return res.status(200).json({ ok: true });
       } else {
