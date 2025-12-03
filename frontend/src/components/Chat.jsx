@@ -37,7 +37,10 @@ const Chat = ({ role = 'user', userEmail }) => {
 
   const fetchMessages = async () => {
     try {
+      console.log('[Chat] Fetching messages for sessionId:', sessionId);
       const { data } = await axios.get(apiUrl(`/api/chat?sessionId=${sessionId}`));
+      console.log('[Chat] Received messages:', data);
+      
       if (Array.isArray(data)) {
         const currentHash = JSON.stringify(data.map(m => ({ t: m.createdAt, s: m.sender })));
         
@@ -65,22 +68,17 @@ const Chat = ({ role = 'user', userEmail }) => {
               new Date(a.createdAt) - new Date(b.createdAt)
             );
             
+            console.log('[Chat] Updated messages count:', result.length);
             return result;
           });
         }
       }
       setError('');
     } catch (e) {
-      console.error('Fetch error:', e);
+      console.error('[Chat] Fetch error:', e);
       setError(`Gagal memuat pesan: ${e.message}`);
     }
   };
-
-  useEffect(() => {
-    fetchMessages();
-    pollRef.current = setInterval(fetchMessages, 3000); // Increase from 2.5s to 3s
-    return () => pollRef.current && clearInterval(pollRef.current);
-  }, []);
 
   // Admin: ambil daftar semua user
   useEffect(() => {
@@ -107,10 +105,28 @@ const Chat = ({ role = 'user', userEmail }) => {
     fetchUsers();
   }, [role]);
 
-  // Ketika memilih room user lain (admin), muat pesan untuk room tersebut
+  // Ketika sessionId berubah atau komponen mount, setup polling
   useEffect(() => {
+    console.log('[Chat] SessionId changed to:', sessionId);
     lastHashRef.current = '';
+    setMessages([]); // Clear messages saat ganti room
+    
+    // Fetch pertama kali
     fetchMessages();
+    
+    // Setup polling
+    if (pollRef.current) {
+      clearInterval(pollRef.current);
+    }
+    pollRef.current = setInterval(fetchMessages, 3000);
+    
+    // Cleanup saat unmount atau sessionId berubah
+    return () => {
+      if (pollRef.current) {
+        clearInterval(pollRef.current);
+        pollRef.current = null;
+      }
+    };
   }, [sessionId]);
 
   const handleSend = async () => {
@@ -126,12 +142,16 @@ const Chat = ({ role = 'user', userEmail }) => {
       _sending: true
     };
     
+    console.log('[Chat] Sending message:', { sessionId, sender: role, text: messageText });
+    
     // Optimistic update - langsung tampilkan di UI
     setMessages(prev => [...prev, optimisticMessage]);
     setInput('');
     
     try {
       const { data } = await axios.post(apiUrl('/api/chat'), { sender: role, text: messageText, sessionId });
+      
+      console.log('[Chat] Message sent successfully:', data);
       
       // Replace temp message with server response
       setMessages(prev => 
@@ -141,7 +161,7 @@ const Chat = ({ role = 'user', userEmail }) => {
       lastHashRef.current = '';
       setError('');
     } catch (e) {
-      console.error('Send error:', e);
+      console.error('[Chat] Send error:', e);
       setError(`Gagal mengirim: ${e.message}`);
       // Mark as failed
       setMessages(prev => 

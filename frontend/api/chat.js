@@ -44,13 +44,17 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   const redis = await getRedis();
+  console.log('[Chat API] Redis status:', redis ? '✅ Connected' : '❌ Using file storage');
 
   // Helper: fallback to file-based storage when Redis isn't configured
   async function handleWithFileStorage() {
+    console.log('[Chat API] Using file storage (Redis not available)');
+    
     if (req.method === 'GET') {
       const { sessionId } = req.query;
       if (sessionId) {
         const messages = chatData.conversations[sessionId] || [];
+        console.log('[Chat API] File storage: Returning', messages.length, 'messages for', sessionId);
         return res.status(200).json(messages);
       }
       return res.status(200).json({
@@ -80,6 +84,8 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'sessionId required' });
       }
 
+      console.log('[Chat API] File storage: Saving message for', sessionId);
+
       const msg = {
         sender,
         text,
@@ -93,6 +99,7 @@ export default async function handler(req, res) {
       chatData.conversations[sessionId].push(msg);
       saveMessages(chatData);
 
+      console.log('[Chat API] File storage: Message saved');
       return res.status(200).json(msg);
     }
 
@@ -127,6 +134,7 @@ export default async function handler(req, res) {
       const count = Math.min(Number(limit) || 100, 200);
 
       if (sessionId) {
+        console.log('[Chat API] GET messages for sessionId:', sessionId);
         const streamKey = `${STREAM_PREFIX}${sessionId}`;
         // Read messages after a cursor if provided, else recent window
         const start = cursor ? `(${cursor}` : '-';
@@ -144,6 +152,7 @@ export default async function handler(req, res) {
           };
         });
 
+        console.log('[Chat API] Returning', messages.length, 'messages for', sessionId);
         return res.status(200).json(messages);
       }
 
@@ -178,6 +187,8 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'sessionId required' });
       }
 
+      console.log('[Chat API] POST message:', { sessionId, sender, text: text.substring(0, 50) });
+
       const streamKey = `${STREAM_PREFIX}${sessionId}`;
       const createdAt = new Date().toISOString();
       const id = await redis.xadd(streamKey, '*', {
@@ -192,6 +203,7 @@ export default async function handler(req, res) {
         timestamp: createdAt,
       });
 
+      console.log('[Chat API] Message saved with id:', id);
       return res.status(200).json({ id, sender, text, createdAt });
     }
 
