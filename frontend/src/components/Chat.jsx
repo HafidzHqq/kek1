@@ -9,16 +9,18 @@ const Chat = ({ role = 'user', userEmail }) => {
   const [users, setUsers] = useState([]); // daftar akun terdaftar (admin)
   const [activeEmail, setActiveEmail] = useState(userEmail || '');
   const [sessionId, setSessionId] = useState(() => {
-    // Gunakan email sebagai sessionId jika tersedia, jika tidak pakai random
+    // SELALU gunakan email sebagai sessionId (format: email_xxx_at_xxx_dot_com)
     if (userEmail) {
       return `email_${userEmail.replace(/@/g, '_at_').replace(/\./g, '_dot_')}`;
     }
-    let id = localStorage.getItem('chatSessionId');
-    if (!id) {
-      id = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-      localStorage.setItem('chatSessionId', id);
+    // Fallback: ambil dari localStorage jika user sudah pernah login
+    const savedEmail = localStorage.getItem('userEmail');
+    if (savedEmail) {
+      return `email_${savedEmail.replace(/@/g, '_at_').replace(/\./g, '_dot_')}`;
     }
-    return id;
+    // Jika tidak ada email sama sekali (tidak seharusnya terjadi karena sudah ada LoginRequired)
+    console.warn('Chat: No user email found, using fallback sessionId');
+    return 'guest_' + Date.now();
   });
   const pollRef = useRef(null);
   const messagesEndRef = useRef(null);
