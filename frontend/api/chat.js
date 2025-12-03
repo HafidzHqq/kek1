@@ -54,10 +54,15 @@ export default async function handler(req, res) {
     if (req.method === 'GET') {
       const { sessionId } = req.query;
       if (sessionId) {
+        // Reload from file to get latest data
+        chatData = loadMessages();
         const messages = chatData.conversations[sessionId] || [];
-        console.log('[Chat API] File storage: Returning', messages.length, 'messages for', sessionId);
+        console.log('[Chat API] 📂 File storage: Returning', messages.length, 'messages for', sessionId);
         return res.status(200).json(messages);
       }
+      
+      // Reload for conversation list too
+      chatData = loadMessages();
       return res.status(200).json({
         conversations: Object.keys(chatData.conversations)
           .map((id) => {
@@ -85,10 +90,13 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'sessionId required' });
       }
 
-      console.log('[Chat API] File storage: Saving message for', sessionId);
+      // Reload before saving to prevent data loss
+      chatData = loadMessages();
+      
+      console.log('[Chat API] 💾 File storage: Saving message for', sessionId);
 
       const msg = {
-        id: `file-${Date.now()}`,
+        id: `file-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         sender,
         text,
         createdAt: new Date().toISOString(),
@@ -101,11 +109,12 @@ export default async function handler(req, res) {
       chatData.conversations[sessionId].push(msg);
       saveMessages(chatData);
 
-      console.log('[Chat API] File storage: Message saved, total messages:', chatData.conversations[sessionId].length);
+      console.log('[Chat API] ✅ File storage: Message saved, total:', chatData.conversations[sessionId].length);
       return res.status(200).json(msg);
     }
 
     if (req.method === 'DELETE') {
+      chatData = loadMessages(); // Reload before delete
       const { sessionId } = req.query;
       if (sessionId) {
         delete chatData.conversations[sessionId];

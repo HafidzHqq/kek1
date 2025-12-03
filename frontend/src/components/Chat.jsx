@@ -24,7 +24,7 @@ const Chat = ({ role = 'user', userEmail }) => {
   });
   const pollRef = useRef(null);
   const messagesEndRef = useRef(null);
-  const lastHashRef = useRef('');
+  const fetchingRef = useRef(false);
   const emailRef = useRef(userEmail);
 
   const scrollToBottom = () => {
@@ -36,47 +36,58 @@ const Chat = ({ role = 'user', userEmail }) => {
   }, [messages]);
 
   const fetchMessages = async () => {
+    // Prevent concurrent fetches
+    if (fetchingRef.current) {
+      console.log('[Chat] Fetch already in progress, skipping');
+      return;
+    }
+    
+    fetchingRef.current = true;
     try {
-      console.log('[Chat] Fetching messages for sessionId:', sessionId, 'Role:', role);
-      const { data } = await axios.get(apiUrl(`/api/chat?sessionId=${sessionId}`));
-      console.log('[Chat] Received', Array.isArray(data) ? data.length : 0, 'messages:', data);
+      console.log('[Chat] Fetching messages for sessionId:', sessionId);
+      const { data } = await axios.get(apiUrl(`/api/chat?sessionId=${sessionId}`), {
+        timeout: 8000 // 8 second timeout
+      });
       
       if (Array.isArray(data)) {
-        const currentHash = JSON.stringify(data.map(m => ({ t: m.createdAt, s: m.sender })));
+        console.log('[Chat] ✅ Received', data.length, 'messages');
         
-        // Only update if messages actually changed
-        if (currentHash !== lastHashRef.current) {
-          lastHashRef.current = currentHash;
+        setMessages(prev => {
+          // Keep temp messages that are still sending
+          const tempMessages = prev.filter(m => m._tempId && m._sending);
           
-          setMessages(prev => {
-            // Create a map of existing messages by createdAt
-            const existingMap = new Map();
-            prev.forEach(m => {
-              if (m.createdAt) existingMap.set(m.createdAt, m);
-            });
-            
-            // Add server messages to map (server is source of truth)
-            data.forEach(m => {
-              existingMap.set(m.createdAt, m);
-            });
-            
-            // Keep temp messages that are still sending or failed
-            const tempMessages = prev.filter(m => m._tempId && (m._sending || m._failed));
-            
-            // Combine: confirmed messages + temp messages
-            const result = [...existingMap.values(), ...tempMessages].sort((a, b) => 
-              new Date(a.createdAt) - new Date(b.createdAt)
+          // Merge: server messages (source of truth) + temp sending messages
+          const serverIds = new Set(data.map(m => m.id));
+          
+          // Remove temp messages that are now confirmed on server
+          const validTempMessages = tempMessages.filter(m => {
+            // If message has same text and timestamp as server message, remove temp
+            const isDuplicate = data.some(sm => 
+              sm.text === m.text && 
+              Math.abs(new Date(sm.createdAt) - new Date(m.createdAt)) < 2000
             );
-            
-            console.log('[Chat] Updated messages count:', result.length);
-            return result;
+            return !isDuplicate;
           });
-        }
+          
+          const result = [...data, ...validTempMessages].sort((a, b) => 
+            new Date(a.createdAt) - new Date(b.createdAt)
+          );
+          
+          console.log('[Chat] 📊 Messages:', data.length, 'from server +', validTempMessages.length, 'temp =', result.length, 'total');
+          return result;
+        });
+        setError('');
+      } else {
+        console.warn('[Chat] ⚠️ Unexpected response format:', typeof data);
       }
-      setError('');
     } catch (e) {
-      console.error('[Chat] Fetch error:', e);
-      setError(`Gagal memuat pesan: ${e.message}`);
+      console.error('[Chat] ❌ Fetch error:', e.message);
+      // Don't show error on timeout - just skip this poll
+      if (!e.message?.includes('timeout')) {
+        setError(`Gagal memuat: ${e.message}`);
+      }
+    } finally {
+      fetchingRef.current = false;
     }
   };
 
@@ -107,18 +118,18 @@ const Chat = ({ role = 'user', userEmail }) => {
 
   // Ketika sessionId berubah atau komponen mount, setup polling
   useEffect(() => {
-    console.log('[Chat] SessionId changed to:', sessionId);
-    lastHashRef.current = '';
+    console.log('[Chat] 🔄 SessionId changed to:', sessionId);
     setMessages([]); // Clear messages saat ganti room
+    fetchingRef.current = false; // Reset fetch lock
     
-    // Fetch pertama kali
+    // Fetch pertama kali (immediate)
     fetchMessages();
     
-    // Setup polling
+    // Setup fast polling (1.5 seconds for better real-time feel)
     if (pollRef.current) {
       clearInterval(pollRef.current);
     }
-    pollRef.current = setInterval(fetchMessages, 3000);
+    pollRef.current = setInterval(fetchMessages, 1500);
     
     // Cleanup saat unmount atau sessionId berubah
     return () => {
@@ -126,6 +137,7 @@ const Chat = ({ role = 'user', userEmail }) => {
         clearInterval(pollRef.current);
         pollRef.current = null;
       }
+      fetchingRef.current = false;
     };
   }, [sessionId]);
 
@@ -134,35 +146,46 @@ const Chat = ({ role = 'user', userEmail }) => {
     
     const messageText = input.trim();
     const tempId = `temp-${Date.now()}`;
+    const now = new Date().toISOString();
     const optimisticMessage = {
       sender: role,
       text: messageText,
-      createdAt: new Date().toISOString(),
+      createdAt: now,
       _tempId: tempId,
       _sending: true
     };
     
-    console.log('[Chat] Sending message:', { sessionId, sender: role, text: messageText });
+    console.log('[Chat] 📤 Sending message:', messageText.substring(0, 50));
     
     // Optimistic update - langsung tampilkan di UI
     setMessages(prev => [...prev, optimisticMessage]);
     setInput('');
     
     try {
-      const { data } = await axios.post(apiUrl('/api/chat'), { sender: role, text: messageText, sessionId });
+      const { data } = await axios.post(apiUrl('/api/chat'), { 
+        sender: role, 
+        text: messageText, 
+        sessionId 
+      }, {
+        timeout: 10000 // 10 second timeout for send
+      });
       
-      console.log('[Chat] Message sent successfully:', data);
+      console.log('[Chat] ✅ Message sent, id:', data.id);
       
-      // Replace temp message with server response
-      setMessages(prev => 
-        prev.map(m => m._tempId === tempId ? { ...data, _sent: true } : m)
-      );
-      // Force refresh hash to trigger next poll update
-      lastHashRef.current = '';
+      // Remove temp message - real message will come from next poll
+      setMessages(prev => prev.filter(m => m._tempId !== tempId));
+      
+      // Force immediate refresh to get server confirmation
+      setTimeout(() => {
+        fetchingRef.current = false; // Reset lock
+        fetchMessages();
+      }, 300);
+      
       setError('');
     } catch (e) {
-      console.error('[Chat] Send error:', e);
+      console.error('[Chat] ❌ Send error:', e.message);
       setError(`Gagal mengirim: ${e.message}`);
+      
       // Mark as failed
       setMessages(prev => 
         prev.map(m => m._tempId === tempId ? { ...m, _failed: true, _sending: false } : m)
