@@ -37,9 +37,9 @@ const Chat = ({ role = 'user', userEmail }) => {
 
   const fetchMessages = async () => {
     try {
-      console.log('[Chat] Fetching messages for sessionId:', sessionId);
+      console.log('[Chat] Fetching messages for sessionId:', sessionId, 'Role:', role);
       const { data } = await axios.get(apiUrl(`/api/chat?sessionId=${sessionId}`));
-      console.log('[Chat] Received messages:', data);
+      console.log('[Chat] Received', Array.isArray(data) ? data.length : 0, 'messages:', data);
       
       if (Array.isArray(data)) {
         const currentHash = JSON.stringify(data.map(m => ({ t: m.createdAt, s: m.sender })));
@@ -232,31 +232,53 @@ const Chat = ({ role = 'user', userEmail }) => {
       {/* Bubble Chat */}
       <div className="flex-1 px-4 py-6 overflow-y-auto">
         <div className="max-w-2xl mx-auto">
-          {messages.map((msg, idx) => (
-            <div key={msg._tempId || `${msg.createdAt}-${idx}`} className={`mb-4 flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}> 
-              <div className={`px-5 py-3 rounded-2xl shadow-lg text-base ${
-                msg.sender === 'user' 
-                  ? msg._failed 
-                    ? 'bg-red-600/70' 
-                    : msg._sending 
-                      ? 'bg-blue-600/70' 
-                      : 'bg-blue-600' 
-                  : 'bg-purple-700'
-              }`}>
-                <div className="flex items-start gap-2">
-                  <div className="flex-1">{msg.text}</div>
-                  {msg.sender === 'user' && (
-                    <div className="text-xs mt-0.5">
-                      {msg._sending && <span title="Mengirim...">⏳</span>}
-                      {msg._failed && <span title="Gagal kirim">❌</span>}
-                      {!msg._sending && !msg._failed && <span title="Terkirim">✓</span>}
-                    </div>
-                  )}
-                </div>
-                {msg._failed && <div className="text-xs text-red-200 mt-1">Gagal kirim</div>}
-              </div>
+          {messages.length === 0 && (
+            <div className="text-center text-gray-400 mt-10">
+              <p className="text-lg">Belum ada percakapan</p>
+              <p className="text-sm mt-2">Mulai chat dengan mengirim pesan pertama</p>
             </div>
-          ))}
+          )}
+          {messages.map((msg, idx) => {
+            // Tentukan apakah pesan dari current role (tampil di kanan)
+            const isMyMessage = msg.sender === role;
+            
+            return (
+              <div key={msg._tempId || msg.id || `${msg.createdAt}-${idx}`} className={`mb-4 flex ${isMyMessage ? 'justify-end' : 'justify-start'}`}> 
+                <div className="flex flex-col max-w-[70%]">
+                  {/* Label sender */}
+                  <div className={`text-xs text-gray-400 mb-1 ${isMyMessage ? 'text-right' : 'text-left'}`}>
+                    {msg.sender === 'admin' ? 'Admin' : 'User'}
+                  </div>
+                  {/* Bubble */}
+                  <div className={`px-5 py-3 rounded-2xl shadow-lg text-base ${
+                    isMyMessage
+                      ? msg._failed 
+                        ? 'bg-red-600/70' 
+                        : msg._sending 
+                          ? 'bg-blue-600/70' 
+                          : 'bg-blue-600' 
+                      : 'bg-purple-700'
+                  }`}>
+                    <div className="flex items-start gap-2">
+                      <div className="flex-1">{msg.text}</div>
+                      {isMyMessage && (
+                        <div className="text-xs mt-0.5">
+                          {msg._sending && <span title="Mengirim...">⏳</span>}
+                          {msg._failed && <span title="Gagal kirim">❌</span>}
+                          {!msg._sending && !msg._failed && <span title="Terkirim">✓</span>}
+                        </div>
+                      )}
+                    </div>
+                    {msg._failed && <div className="text-xs text-red-200 mt-1">Gagal kirim</div>}
+                  </div>
+                  {/* Timestamp */}
+                  <div className={`text-xs text-gray-500 mt-1 ${isMyMessage ? 'text-right' : 'text-left'}`}>
+                    {new Date(msg.createdAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
           <div ref={messagesEndRef} />
         </div>
       </div>
