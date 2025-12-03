@@ -243,6 +243,8 @@ const Chat = ({ role = 'user', userEmail }) => {
       {/* Input Chat */}
       <div className="px-8 py-6 bg-gray-950 border-t border-purple-700 flex items-center">
         <input
+          id="chat-message"
+          name="message"
           className="flex-1 p-3 rounded-full bg-gray-800 text-white focus:outline-none focus:ring-2 focus:ring-purple-600"
           type="text"
           value={input}

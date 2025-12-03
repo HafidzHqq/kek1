@@ -56,14 +56,16 @@ export function AuthMenu({ onAuth }) {
         <form onSubmit={handleSubmit}>
           {!isLogin && (
             <div className="mb-4">
-              <input type="text" placeholder="Nama" value={name} onChange={e => setName(e.target.value)} className="w-full px-4 py-3 rounded-lg border border-gray-700 bg-gray-800 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              <input id="name" name="name" type="text" placeholder="Nama" value={name} onChange={e => setName(e.target.value)} autoComplete="name" className="w-full px-4 py-3 rounded-lg border border-gray-700 bg-gray-800 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
             </div>
           )}
           <div className="mb-4">
-            <input type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} required autoComplete="email" className="w-full px-4 py-3 rounded-lg border border-gray-700 bg-gray-800 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+            <input id="email" name="email" type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} required autoComplete="email" className="w-full px-4 py-3 rounded-lg border border-gray-700 bg-gray-800 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
           </div>
           <div className="mb-4">
             <input 
+              id="password" 
+              name="password" 
               type="password" 
               placeholder="Password" 
               value={password} 

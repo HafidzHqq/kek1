@@ -23,8 +23,10 @@ async function loadUsers(redis) {
         for (const [email, json] of Object.entries(data)) {
           users[email] = JSON.parse(json);
         }
+        console.log(`[Auth] ✅ Loaded ${Object.keys(users).length} users from Redis`);
         return users;
       }
+      console.log('[Auth] Redis connected but no users found');
     } catch (e) {
       console.error('Error loading users from Redis:', e);
     }
@@ -32,7 +34,9 @@ async function loadUsers(redis) {
   // Fallback to file
   try {
     if (fs.existsSync(USERS_FILE)) {
-      return JSON.parse(fs.readFileSync(USERS_FILE, 'utf8'));
+      const users = JSON.parse(fs.readFileSync(USERS_FILE, 'utf8'));
+      console.log(`[Auth] Loaded ${Object.keys(users).length} users from file (fallback)`);
+      return users;
     }
   } catch (e) {
     console.error('Error loading users from file:', e);
@@ -48,9 +52,12 @@ async function saveUsers(users, redis) {
         pipeline.hset(REDIS_USERS_KEY, email, JSON.stringify(user));
       }
       await pipeline.exec();
+      console.log(`[Auth] ✅ Saved ${Object.keys(users).length} users to Redis`);
     } catch (e) {
       console.error('Error saving users to Redis:', e);
     }
+  } else {
+    console.log('[Auth] ⚠️ Redis not available, using file storage only');
   }
   // Also save to file as backup
   try {
@@ -128,6 +135,7 @@ module.exports = async function handler(req, res) {
   const endpoint = pathname.replace('/api/auth', '');
   
   const redis = await getRedis();
+  console.log('[Auth] Redis connection status:', redis ? '✅ Connected' : '❌ Not connected (using file storage)');
   const users = await loadUsers(redis);
   const sessions = await loadSessions(redis);
 
