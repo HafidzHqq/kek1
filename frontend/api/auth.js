@@ -179,28 +179,6 @@ module.exports = async function handler(req, res) {
     });
   }
 
-  // GET /api/auth/users
-  // Mengembalikan daftar semua akun terdaftar (admin-only)
-  if (req.method === 'GET' && endpoint === '/users') {
-    const authHeader = req.headers.authorization || '';
-    const token = authHeader.replace('Bearer ', '');
-    if (!token || !sessions[token]) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
-    const session = sessions[token];
-    const requester = users[session.email];
-    if (!requester || requester.role !== 'admin') {
-      return res.status(403).json({ error: 'Forbidden: admin only' });
-    }
-    const list = Object.values(users).map(u => ({
-      email: u.email,
-      name: u.name,
-      role: u.role,
-      createdAt: u.createdAt
-    }));
-    return res.status(200).json({ success: true, users: list });
-  }
-
   // POST /api/auth/logout
   if (req.method === 'POST' && endpoint === '/logout') {
     const authHeader = req.headers.authorization || '';

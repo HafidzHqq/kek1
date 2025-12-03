@@ -7,6 +7,7 @@ import './App.css';
 import { Navbar } from './components/Navbar';
 import { Hero } from './components/Hero';
 import { Services } from './components/Services';
+import LoginRequired from './components/LoginRequired';
 import { WhyUs } from './components/WhyUs';
 import { Portfolio } from './components/Portfolio';
 import { Testimonials } from './components/Testimonials';
@@ -59,6 +60,15 @@ function App() {
     };
 
     verifySession();
+  }, []);
+
+  // On mount, open auth modal if a flag was set by a protected route
+  useEffect(() => {
+    const shouldShowAuth = localStorage.getItem('showAuthModal');
+    if (shouldShowAuth) {
+      setShowAuthModal(true);
+      localStorage.removeItem('showAuthModal');
+    }
   }, []);
 
   useEffect(() => {
@@ -155,7 +165,7 @@ function App() {
           </div>
         } />
         <Route path="/admin" element={isAdmin ? <AdminDashboard onLogout={handleLogout} /> : <Navigate to="/" replace />} />
-        <Route path="/chat" element={<Chat role={isAdmin ? 'admin' : 'user'} userEmail={userEmail} />} />
+        <Route path="/chat" element={auth ? <Chat role={isAdmin ? 'admin' : 'user'} userEmail={userEmail} /> : <LoginRequired />} />
       </Routes>
     </BrowserRouter>
   );

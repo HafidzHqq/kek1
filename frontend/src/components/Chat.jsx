@@ -6,10 +6,11 @@ const Chat = ({ role = 'user', userEmail }) => {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [error, setError] = useState('');
-  const [sessionId] = useState(() => {
-    // Use email as sessionId if available, fallback to random
+  const [users, setUsers] = useState([]); // daftar akun terdaftar (admin)
+  const [activeEmail, setActiveEmail] = useState(userEmail || '');
+  const [sessionId, setSessionId] = useState(() => {
+    // Gunakan email sebagai sessionId jika tersedia, jika tidak pakai random
     if (userEmail) {
-      // Encode email: test@example.com -> email_test_at_example_dot_com
       return `email_${userEmail.replace(/@/g, '_at_').replace(/\./g, '_dot_')}`;
     }
     let id = localStorage.getItem('chatSessionId');
@@ -79,6 +80,37 @@ const Chat = ({ role = 'user', userEmail }) => {
     return () => pollRef.current && clearInterval(pollRef.current);
   }, []);
 
+  // Admin: ambil daftar semua user
+  useEffect(() => {
+    const fetchUsers = async () => {
+      if (role !== 'admin') return;
+      try {
+        const token = localStorage.getItem('authToken');
+        const { data } = await axios.get(apiUrl('/api/auth/users'), {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (data?.success && Array.isArray(data.users)) {
+          setUsers(data.users);
+          // jika belum ada activeEmail, pilih pertama
+          if (!activeEmail && data.users.length) {
+            const firstEmail = data.users[0].email;
+            setActiveEmail(firstEmail);
+            setSessionId(`email_${firstEmail.replace(/@/g, '_at_').replace(/\./g, '_dot_')}`);
+          }
+        }
+      } catch (e) {
+        console.error('Gagal memuat daftar akun:', e);
+      }
+    };
+    fetchUsers();
+  }, [role]);
+
+  // Ketika memilih room user lain (admin), muat pesan untuk room tersebut
+  useEffect(() => {
+    lastHashRef.current = '';
+    fetchMessages();
+  }, [sessionId]);
+
   const handleSend = async () => {
     if (!input.trim()) return;
     
@@ -117,8 +149,42 @@ const Chat = ({ role = 'user', userEmail }) => {
   };
 
   return (
-    <div className="flex flex-col h-screen bg-gradient-to-br from-gray-900 via-blue-950 to-purple-900 text-white">
-      {/* Header Chat */}
+    <div className={`h-screen ${role==='admin' ? 'grid grid-cols-[320px_1fr]' : 'flex flex-col'} bg-gradient-to-br from-gray-900 via-blue-950 to-purple-900 text-white`}>
+      {/* Sidebar untuk admin: daftar semua akun */}
+      {role === 'admin' && (
+        <div className="bg-gray-950 border-r border-purple-700 overflow-y-auto">
+          <div className="px-4 py-4 border-b border-purple-700 flex items-center justify-between">
+            <div className="font-semibold">Daftar Chat</div>
+            <div className="text-xs bg-purple-700/30 px-2 py-1 rounded-full">{users.length}</div>
+          </div>
+          <div>
+            {users.map(u => (
+              <button
+                key={u.email}
+                onClick={() => {
+                  setActiveEmail(u.email);
+                  setSessionId(`email_${u.email.replace(/@/g, '_at_').replace(/\./g, '_dot_')}`);
+                }}
+                className={`w-full text-left px-4 py-3 flex items-center gap-3 hover:bg-purple-700/20 transition ${activeEmail===u.email ? 'bg-purple-700/10' : ''}`}
+              >
+                <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center">
+                  <span className="font-bold">{(u.name||u.email)[0]?.toUpperCase()}</span>
+                </div>
+                <div className="flex-1">
+                  <div className="font-medium text-sm">{u.name || u.email}</div>
+                  <div className="text-xs text-gray-400">{u.email}</div>
+                </div>
+              </button>
+            ))}
+            {!users.length && (
+              <div className="px-4 py-6 text-sm text-gray-400">Belum ada akun terdaftar.</div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Area Chat */}
+      <div className="flex flex-col">
       <div className="py-6 px-8 bg-gray-950 border-b border-purple-700 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center">
@@ -131,7 +197,9 @@ const Chat = ({ role = 'user', userEmail }) => {
         </div>
         <div className="text-right">
           <div className="text-purple-400 font-semibold">Live Chat</div>
-          {userEmail && <div className="text-xs text-gray-400">{userEmail}</div>}
+          {(role==='admin' ? activeEmail : userEmail) && (
+            <div className="text-xs text-gray-400">{role==='admin' ? activeEmail : userEmail}</div>
+          )}
         </div>
       </div>
       {/* Info error */}
@@ -187,6 +255,7 @@ const Chat = ({ role = 'user', userEmail }) => {
         >
           Kirim
         </button>
+      </div>
       </div>
     </div>
   );
