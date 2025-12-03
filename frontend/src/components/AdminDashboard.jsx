@@ -18,6 +18,7 @@ export function AdminDashboard({ onLogout }) {
   const [selectedSession, setSelectedSession] = useState(null);
   const [chatMessages, setChatMessages] = useState([]);
   const [chatInput, setChatInput] = useState("");
+  const [users, setUsers] = useState([]);
   const chatEndRef = useRef(null);
   const hasAutoSelected = useRef(false);
   const lastConversationsHash = useRef('');
@@ -32,7 +33,7 @@ export function AdminDashboard({ onLogout }) {
   }, [chatMessages]);
 
   useEffect(() => {
-    // Dummy fetch; ganti dengan API nyata jika tersedia
+    // Fetch contacts/messages
     fetch(apiUrl("/api/contact"))
       .then((res) => res.ok ? res.json() : [])
       .then((data) => {
@@ -40,6 +41,23 @@ export function AdminDashboard({ onLogout }) {
         setLoading(false);
       })
       .catch(() => setLoading(false));
+    
+    // Fetch users dari API
+    const fetchUsers = async () => {
+      try {
+        const token = localStorage.getItem('authToken');
+        const res = await fetch(apiUrl('/api/auth/users'), {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        const data = await res.json();
+        if (data?.success && Array.isArray(data.users)) {
+          setUsers(data.users);
+        }
+      } catch (e) {
+        console.error('Error fetching users:', e);
+      }
+    };
+    fetchUsers();
   }, []);
 
   // Polling untuk daftar conversations
@@ -174,11 +192,17 @@ export function AdminDashboard({ onLogout }) {
     }
   };
 
-  const stats = useMemo(() => ({
-    totalMessages: messages.length,
-    activeChats: Math.min(3, messages.length),
-    totalUsers: 5,
-  }), [messages.length]);
+  const stats = useMemo(() => {
+    // Hitung total messages dari semua conversations
+    const totalMessages = conversations.reduce((sum, conv) => sum + (conv.messageCount || 0), 0);
+    const activeChats = conversations.filter(conv => conv.messageCount > 0).length;
+    
+    return {
+      totalMessages,
+      activeChats,
+      totalUsers: users.length,
+    };
+  }, [conversations, users.length]);
 
   return (
     <div className="min-h-screen grid grid-cols-12 bg-[#0b0b13] text-white">
@@ -361,17 +385,41 @@ export function AdminDashboard({ onLogout }) {
 
           {active === "users" && (
             <section className="bg-white/5 rounded-xl border border-white/10">
-              <div className="px-5 py-3 border-b border-white/10 font-semibold">Daftar Users</div>
+              <div className="px-5 py-3 border-b border-white/10 font-semibold flex items-center justify-between">
+                <span>Daftar Users</span>
+                <span className="text-xs bg-indigo-600 px-2 py-1 rounded-full">{users.length}</span>
+              </div>
               <div className="p-5 overflow-x-auto">
-                <table className="min-w-full text-sm">
-                  <thead className="text-left text-white/60">
-                    <tr><th className="py-2">Nama</th><th>Email</th><th>Role</th></tr>
-                  </thead>
-                  <tbody className="divide-y divide-white/10">
-                    <tr><td className="py-2">Admin</td><td>gegefans0@gmail.com</td><td>admin</td></tr>
-                    <tr><td className="py-2">User Demo</td><td>user@example.com</td><td>user</td></tr>
-                  </tbody>
-                </table>
+                {users.length === 0 ? (
+                  <div className="text-white/60 text-center py-8">Belum ada user terdaftar.</div>
+                ) : (
+                  <table className="min-w-full text-sm">
+                    <thead className="text-left text-white/60">
+                      <tr>
+                        <th className="py-2">Nama</th>
+                        <th>Email</th>
+                        <th>Role</th>
+                        <th>Terdaftar</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/10">
+                      {users.map((user, idx) => (
+                        <tr key={idx}>
+                          <td className="py-2">{user.name || '-'}</td>
+                          <td>{user.email}</td>
+                          <td>
+                            <span className={`px-2 py-1 rounded text-xs ${user.role === 'admin' ? 'bg-purple-600/30 text-purple-300' : 'bg-blue-600/30 text-blue-300'}`}>
+                              {user.role}
+                            </span>
+                          </td>
+                          <td className="text-white/60 text-xs">
+                            {user.createdAt ? new Date(user.createdAt).toLocaleDateString('id-ID') : '-'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
               </div>
             </section>
           )}
