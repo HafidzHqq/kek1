@@ -1,6 +1,8 @@
-// Universal chat API - auto-detects Postgres, then MySQL, else falls back to file storage
+// Universal chat API - auto-detects MongoDB, then Postgres, then MySQL, else falls back to file storage
 const pgDb = require('./_pg');
 const chatPG = require('./_chat_pg');
+const mongoDb = require('./_mongo');
+const chatMongo = require('./_chat_mongo');
 const { getPool } = require('./_mysql');
 const chatMySQL = require('./_chat_mysql');
 const fs = require('fs');
@@ -39,12 +41,16 @@ export default async function handler(req, res) {
   setCors(res);
   if (req.method === 'OPTIONS') return res.status(200).end();
 
-  // prefer Postgres, else MySQL, else file
+  // prefer MongoDB, then Postgres, then MySQL, else file
   let driver = 'file';
-  const pgPool = await pgDb.getPool();
-  if (pgPool) driver = 'postgres';
-  else if (await getPool()) driver = 'mysql';
-  console.log(`[Chat] Using ${driver === 'postgres' ? 'Postgres 🐘' : driver === 'mysql' ? 'MySQL 💾' : 'File Storage 📂'}`);
+  const mongo = await mongoDb.getDb();
+  if (mongo) driver = 'mongo';
+  else {
+    const pgPool = await pgDb.getPool();
+    if (pgPool) driver = 'postgres';
+    else if (await getPool()) driver = 'mysql';
+  }
+  console.log(`[Chat] Using ${driver === 'mongo' ? 'MongoDB 🍃' : driver === 'postgres' ? 'Postgres 🐘' : driver === 'mysql' ? 'MySQL 💾' : 'File Storage 📂'}`);
 
   try {
     // GET - Retrieve messages
@@ -53,7 +59,10 @@ export default async function handler(req, res) {
 
       if (sessionId) {
         // Get messages for specific session
-        if (driver === 'postgres') {
+        if (driver === 'mongo') {
+          const messages = await chatMongo.getMessages(sessionId);
+          return res.status(200).json(messages);
+        } else if (driver === 'postgres') {
           const messages = await chatPG.getMessages(sessionId);
           return res.status(200).json(messages);
         } else if (driver === 'mysql') {
@@ -68,7 +77,10 @@ export default async function handler(req, res) {
         }
       } else {
         // Get all conversations
-        if (driver === 'postgres') {
+        if (driver === 'mongo') {
+          const conversations = await chatMongo.getConversations();
+          return res.status(200).json({ conversations });
+        } else if (driver === 'postgres') {
           const conversations = await chatPG.getConversations();
           return res.status(200).json({ conversations });
         } else if (driver === 'mysql') {
@@ -108,7 +120,13 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'sessionId required' });
       }
 
-      if (driver === 'postgres') {
+      if (driver === 'mongo') {
+        const message = await chatMongo.saveMessage(sessionId, sender, text);
+        if (!message) {
+          return res.status(500).json({ error: 'Failed to save message' });
+        }
+        return res.status(200).json(message);
+      } else if (driver === 'postgres') {
         const message = await chatPG.saveMessage(sessionId, sender, text);
         if (!message) {
           return res.status(500).json({ error: 'Failed to save message' });
@@ -147,7 +165,10 @@ export default async function handler(req, res) {
     if (req.method === 'DELETE') {
       const { sessionId } = req.query;
 
-      if (driver === 'postgres') {
+      if (driver === 'mongo') {
+        await chatMongo.deleteMessages(sessionId || null);
+        return res.status(200).json({ ok: true });
+      } else if (driver === 'postgres') {
         await chatPG.deleteMessages(sessionId || null);
         return res.status(200).json({ ok: true });
       } else if (driver === 'mysql') {

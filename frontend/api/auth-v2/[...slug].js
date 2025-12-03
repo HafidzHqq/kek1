@@ -1,5 +1,6 @@
 // Universal auth API - auto-detects Postgres, then MySQL, else falls back to file storage
 const pgDb = require('../_pg');
+const mongoDb = require('../_mongo');
 const { getPool, initTables, cleanupExpiredSessions } = require('../_mysql');
 const authMySQL = require('../_auth_mysql');
 const authPG = require('../_auth_pg');
@@ -67,23 +68,30 @@ export default async function handler(req, res) {
   setCors(res);
   if (req.method === 'OPTIONS') return res.status(200).end();
 
-  // Prefer Postgres; if unavailable, try MySQL; else file
+  // Prefer MongoDB; then Postgres; then MySQL; else file
   let driver = 'file';
-  const pgPool = await pgDb.getPool();
-  if (pgPool) {
-    await pgDb.initTables();
-    if (Math.random() < 0.1) pgDb.cleanupExpiredSessions();
-    driver = 'postgres';
+  const mongo = await mongoDb.getDb();
+  if (mongo) {
+    await mongoDb.initCollections();
+    if (Math.random() < 0.1) mongoDb.cleanupExpiredSessions();
+    driver = 'mongo';
   } else {
-    const myPool = await getPool();
-    if (myPool) {
-      await initTables();
-      if (Math.random() < 0.1) cleanupExpiredSessions();
-      driver = 'mysql';
+    const pgPool = await pgDb.getPool();
+    if (pgPool) {
+      await pgDb.initTables();
+      if (Math.random() < 0.1) pgDb.cleanupExpiredSessions();
+      driver = 'postgres';
+    } else {
+      const myPool = await getPool();
+      if (myPool) {
+        await initTables();
+        if (Math.random() < 0.1) cleanupExpiredSessions();
+        driver = 'mysql';
+      }
     }
   }
 
-  console.log(`[Auth] Using ${driver === 'postgres' ? 'Postgres' : driver === 'mysql' ? 'MySQL' : 'File Storage'}`);
+  console.log(`[Auth] Using ${driver === 'mongo' ? 'MongoDB' : driver === 'postgres' ? 'Postgres' : driver === 'mysql' ? 'MySQL' : 'File Storage'}`);
 
   const [, , action] = (req.url || '').split('/').filter(Boolean);
 
@@ -95,7 +103,20 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'Email and password required' });
       }
 
-      if (driver === 'postgres') {
+      if (driver === 'mongo') {
+        const authMongo = require('../_auth_mongo');
+        const existing = await authMongo.getUser(email);
+        if (existing) {
+          return res.status(400).json({ error: 'Email already registered' });
+        }
+        const role = email === (authMySQL.ADMIN_EMAIL || 'gegefans0@gmail.com') ? 'admin' : 'user';
+        const user = await authMongo.createUser(email, password, name || '', role);
+        if (!user) {
+          return res.status(400).json({ error: 'Email already registered' });
+        }
+        const session = await authMongo.createSession(email, role);
+        return res.status(200).json({ success: true, token: session.token, sessionId: session.sessionId, email, role });
+      } else if (driver === 'postgres') {
         const user = await authPG.createUser(email, password, name || '');
         if (!user) {
           return res.status(400).json({ error: 'Email already registered' });
@@ -161,7 +182,15 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'Email and password required' });
       }
 
-      if (driver === 'postgres') {
+      if (driver === 'mongo') {
+        const authMongo = require('../_auth_mongo');
+        const user = await authMongo.verifyUser(email, password);
+        if (!user) {
+          return res.status(401).json({ error: 'Invalid credentials' });
+        }
+        const session = await authMongo.createSession(user.email, user.role);
+        return res.status(200).json({ success: true, token: session.token, sessionId: session.sessionId, email: user.email, role: user.role });
+      } else if (driver === 'postgres') {
         const user = await authPG.verifyUser(email, password);
         if (!user) {
           return res.status(401).json({ error: 'Invalid credentials' });
@@ -220,7 +249,14 @@ export default async function handler(req, res) {
         return res.status(401).json({ error: 'No token provided' });
       }
 
-      if (driver === 'postgres') {
+      if (driver === 'mongo') {
+        const authMongo = require('../_auth_mongo');
+        const session = await authMongo.verifySession(token);
+        if (!session) {
+          return res.status(401).json({ error: 'Invalid or expired session' });
+        }
+        return res.status(200).json({ valid: true, email: session.email, sessionId: session.sessionId, role: session.role });
+      } else if (driver === 'postgres') {
         const session = await authPG.verifySession(token);
         if (!session) {
           return res.status(401).json({ error: 'Invalid or expired session' });
@@ -265,7 +301,11 @@ export default async function handler(req, res) {
         return res.status(200).json({ success: true });
       }
 
-      if (driver === 'postgres') {
+      if (driver === 'mongo') {
+        const authMongo = require('../_auth_mongo');
+        await authMongo.deleteSession(token);
+        return res.status(200).json({ success: true });
+      } else if (driver === 'postgres') {
         await authPG.deleteSession(token);
         return res.status(200).json({ success: true });
       } else if (driver === 'mysql') {
@@ -291,7 +331,15 @@ export default async function handler(req, res) {
         return res.status(401).json({ error: 'Unauthorized' });
       }
 
-      if (driver === 'postgres') {
+      if (driver === 'mongo') {
+        const authMongo = require('../_auth_mongo');
+        const session = await authMongo.verifySession(token);
+        if (!session || session.role !== 'admin') {
+          return res.status(403).json({ error: 'Admin access required' });
+        }
+        const users = await authMongo.getAllUsers();
+        return res.status(200).json({ success: true, users });
+      } else if (driver === 'postgres') {
         const session = await authPG.verifySession(token);
         if (!session || session.role !== 'admin') {
           return res.status(403).json({ error: 'Admin access required' });
