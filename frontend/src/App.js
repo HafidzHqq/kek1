@@ -52,10 +52,11 @@ function App() {
           console.log('[App] Session verification failed: invalid response');
           localStorage.removeItem('authToken');
           localStorage.removeItem('userEmail');
+          setAuth(null);
         }
       } catch (err) {
-        console.log('[App] Session verification failed:', err.response?.data?.error || err.message);
-        // Clear invalid token
+        // Jangan log error, cukup clear token dan continue
+        console.log('[App] Session invalid or expired, clearing local storage');
         localStorage.removeItem('authToken');
         localStorage.removeItem('userEmail');
         setAuth(null);

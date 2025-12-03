@@ -21,12 +21,21 @@ export function AuthMenu({ onAuth }) {
         ? { email, password } 
         : { email, password, name };
       
+      console.log('[AuthMenu] Attempting', isLogin ? 'login' : 'register', 'for:', email);
+      
       const { data } = await axios.post(apiUrl(endpoint), payload);
       
+      console.log('[AuthMenu] Response:', data.success ? 'Success' : 'Failed');
+      
       if (data.success && data.token) {
+        // Clear any old data first
+        localStorage.clear();
+        
         // Store token in localStorage
         localStorage.setItem('authToken', data.token);
         localStorage.setItem('userEmail', data.user.email);
+        
+        console.log('[AuthMenu] Stored token and calling onAuth');
         
         onAuth({ 
           role: data.user.role, 
@@ -35,15 +44,23 @@ export function AuthMenu({ onAuth }) {
           token: data.token
         });
       } else {
-        setError(data.error || 'Login gagal');
+        setError(data.error || 'Autentikasi gagal');
       }
     } catch (err) {
-      console.error('Auth error:', err);
+      console.error('[AuthMenu] Error:', err.response?.data || err.message);
+      
       // Extract error message safely
-      const errorMessage = err.response?.data?.error 
-        || err.message 
-        || 'Terjadi kesalahan. Silakan coba lagi.';
-      setError(String(errorMessage));
+      let errorMessage = 'Terjadi kesalahan. Silakan coba lagi.';
+      
+      if (err.response?.status === 401) {
+        errorMessage = err.response?.data?.error || 'Email atau password salah';
+      } else if (err.response?.status === 400) {
+        errorMessage = err.response?.data?.error || 'Data tidak valid';
+      } else if (err.response?.data?.error) {
+        errorMessage = err.response.data.error;
+      }
+      
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -80,10 +97,27 @@ export function AuthMenu({ onAuth }) {
           <button type="submit" disabled={loading} className="w-full py-3 rounded-lg bg-gradient-to-r from-indigo-600 via-purple-600 to-black text-white font-bold text-lg shadow-md hover:from-indigo-700 hover:via-purple-700 hover:to-gray-900 transition">{loading ? "Loading..." : isLogin ? "Login" : "Create Account"}</button>
         </form>
         <div className="mt-6">
-          <button type="button" className="text-indigo-400 hover:underline" onClick={() => setIsLogin(!isLogin)}>
+          <button type="button" className="text-indigo-400 hover:underline" onClick={() => {
+            setError('');
+            setIsLogin(!isLogin);
+          }}>
             {isLogin ? "Create an account" : "Already have an account? Login"}
           </button>
         </div>
+        {error && (
+          <div className="mt-4">
+            <button 
+              type="button" 
+              onClick={() => {
+                localStorage.clear();
+                window.location.reload();
+              }}
+              className="text-xs text-gray-400 hover:text-white underline"
+            >
+              Masih error? Klik di sini untuk reset
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
