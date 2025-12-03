@@ -54,3 +54,25 @@ code {
     @apply bg-background text-foreground;
   }
 }
+
+/* Mobile safe area padding */
+@supports (padding: env(safe-area-inset-top)) {
+  .safe-top {
+    padding-top: max(0.75rem, env(safe-area-inset-top));
+  }
+  .safe-bottom {
+    padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+  }
+}
+
+/* Prevent zoom on input focus on mobile */
+@media (max-width: 768px) {
+  input, textarea, select {
+    font-size: 16px !important;
+  }
+}
+
+/* Smooth scroll for chat */
+.overflow-y-auto {
+  -webkit-overflow-scrolling: touch;
+}

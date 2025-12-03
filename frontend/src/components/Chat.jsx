@@ -26,6 +26,7 @@ const Chat = ({ role = 'user', userEmail }) => {
   const messagesEndRef = useRef(null);
   const fetchingRef = useRef(false);
   const emailRef = useRef(userEmail);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -194,10 +195,26 @@ const Chat = ({ role = 'user', userEmail }) => {
   };
 
   return (
-    <div className={`h-screen ${role==='admin' ? 'grid grid-cols-[320px_1fr]' : 'flex flex-col'} bg-gradient-to-br from-gray-900 via-blue-950 to-purple-900 text-white`}>
-      {/* Sidebar untuk admin: daftar semua akun */}
+    <div className="h-screen flex bg-gradient-to-br from-gray-900 via-blue-950 to-purple-900 text-white overflow-hidden">
+      {/* Sidebar untuk admin: daftar semua akun - Mobile responsive */}
       {role === 'admin' && (
-        <div className="bg-gray-950 border-r border-purple-700 overflow-y-auto">
+        <>
+          {/* Mobile overlay */}
+          {sidebarOpen && (
+            <div 
+              className="fixed inset-0 bg-black/50 z-40 lg:hidden" 
+              onClick={() => setSidebarOpen(false)}
+            />
+          )}
+          
+          {/* Sidebar */}
+          <div className={`
+            fixed lg:relative inset-y-0 left-0 z-50
+            w-72 lg:w-80
+            bg-gray-950 border-r border-purple-700 overflow-y-auto
+            transform transition-transform duration-300 ease-in-out
+            ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+          `}>
           <div className="px-4 py-4 border-b border-purple-700 flex items-center justify-between">
             <div className="font-semibold">Daftar User</div>
             <div className="text-xs bg-purple-700/30 px-2 py-1 rounded-full">{users.length}</div>
@@ -209,6 +226,7 @@ const Chat = ({ role = 'user', userEmail }) => {
                 onClick={() => {
                   setActiveEmail(u.email);
                   setSessionId(`email_${u.email.replace(/@/g, '_at_').replace(/\./g, '_dot_')}`);
+                  setSidebarOpen(false); // Close sidebar on mobile after select
                 }}
                 className={`w-full text-left px-4 py-3 flex items-center gap-3 hover:bg-purple-700/20 transition ${activeEmail===u.email ? 'bg-purple-700/10' : ''}`}
               >
@@ -229,31 +247,44 @@ const Chat = ({ role = 'user', userEmail }) => {
       )}
 
       {/* Area Chat */}
-      <div className="flex flex-col">
-      <div className="py-6 px-8 bg-gray-950 border-b border-purple-700 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center">
-            <span className="font-bold text-lg">A</span>
+      <div className="flex flex-col flex-1 min-w-0">
+      <div className="py-3 px-4 md:py-4 md:px-6 bg-gray-950 border-b border-purple-700 flex items-center justify-between safe-top">
+        <div className="flex items-center gap-2 md:gap-3 flex-1 min-w-0">
+          {/* Mobile menu button for admin */}
+          {role === 'admin' && (
+            <button
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              className="lg:hidden p-2 hover:bg-purple-700/20 rounded-lg transition"
+              aria-label="Toggle sidebar"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
+          )}
+          
+          <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center flex-shrink-0">
+            <span className="font-bold text-sm md:text-lg">A</span>
           </div>
-          <div>
-            <div className="font-semibold text-lg">Admin Inovatech</div>
+          <div className="min-w-0 flex-1">
+            <div className="font-semibold text-sm md:text-base truncate">Admin Inovatech</div>
             <div className="text-xs text-gray-400">Online</div>
           </div>
         </div>
-        <div className="text-right">
-          <div className="text-purple-400 font-semibold">Live Chat</div>
+        <div className="text-right hidden sm:block">
+          <div className="text-purple-400 font-semibold text-sm">Live Chat</div>
           {(role==='admin' ? activeEmail : userEmail) && (
-            <div className="text-xs text-gray-400">{role==='admin' ? activeEmail : userEmail}</div>
+            <div className="text-xs text-gray-400 truncate max-w-[150px]">{role==='admin' ? activeEmail : userEmail}</div>
           )}
         </div>
       </div>
       {/* Info error */}
       {error && (
-        <div className="px-8 py-3 bg-red-600/20 text-red-300 text-sm">{error}</div>
+        <div className="px-4 md:px-6 py-2 bg-red-600/20 text-red-300 text-xs md:text-sm">{error}</div>
       )}
 
       {/* Bubble Chat */}
-      <div className="flex-1 px-4 py-6 overflow-y-auto">
+      <div className="flex-1 px-3 py-4 md:px-4 md:py-6 overflow-y-auto">
         <div className="max-w-2xl mx-auto">
           {messages.length === 0 && (
             <div className="text-center text-gray-400 mt-10">
@@ -266,14 +297,14 @@ const Chat = ({ role = 'user', userEmail }) => {
             const isMyMessage = msg.sender === role;
             
             return (
-              <div key={msg._tempId || msg.id || `${msg.createdAt}-${idx}`} className={`mb-4 flex ${isMyMessage ? 'justify-end' : 'justify-start'}`}> 
-                <div className="flex flex-col max-w-[70%]">
+              <div key={msg._tempId || msg.id || `${msg.createdAt}-${idx}`} className={`mb-3 md:mb-4 flex ${isMyMessage ? 'justify-end' : 'justify-start'}`}> 
+                <div className="flex flex-col max-w-[85%] sm:max-w-[75%] md:max-w-[70%]">
                   {/* Label sender */}
                   <div className={`text-xs text-gray-400 mb-1 ${isMyMessage ? 'text-right' : 'text-left'}`}>
                     {msg.sender === 'admin' ? 'Admin' : 'User'}
                   </div>
                   {/* Bubble */}
-                  <div className={`px-5 py-3 rounded-2xl shadow-lg text-base ${
+                  <div className={`px-3 py-2 md:px-4 md:py-3 rounded-2xl shadow-lg text-sm md:text-base break-words ${
                     isMyMessage
                       ? msg._failed 
                         ? 'bg-red-600/70' 
@@ -306,11 +337,11 @@ const Chat = ({ role = 'user', userEmail }) => {
         </div>
       </div>
       {/* Input Chat */}
-      <div className="px-8 py-6 bg-gray-950 border-t border-purple-700 flex items-center">
+      <div className="px-3 py-3 md:px-6 md:py-4 bg-gray-950 border-t border-purple-700 flex items-center gap-2 md:gap-3 safe-bottom">
         <input
           id="chat-message"
           name="message"
-          className="flex-1 p-3 rounded-full bg-gray-800 text-white focus:outline-none focus:ring-2 focus:ring-purple-600"
+          className="flex-1 px-3 py-2.5 md:px-4 md:py-3 rounded-full bg-gray-800 text-white text-sm md:text-base focus:outline-none focus:ring-2 focus:ring-purple-600"
           type="text"
           value={input}
           onChange={e => setInput(e.target.value)}
@@ -318,11 +349,12 @@ const Chat = ({ role = 'user', userEmail }) => {
           placeholder="Tulis pesan..."
         />
         <button
-          className="ml-4 px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full text-white font-semibold shadow-lg hover:from-blue-700 hover:to-purple-700 transition-all"
+          className="px-4 py-2.5 md:px-6 md:py-3 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full text-white text-sm md:text-base font-semibold shadow-lg hover:from-blue-700 hover:to-purple-700 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
           onClick={handleSend}
           disabled={!input.trim()}
         >
-          Kirim
+          <span className="hidden sm:inline">Kirim</span>
+          <span className="sm:hidden">📤</span>
         </button>
       </div>
       </div>
