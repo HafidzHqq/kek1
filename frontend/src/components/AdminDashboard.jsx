@@ -99,8 +99,11 @@ export function AdminDashboard({ onLogout }) {
     
     const fetchChat = async () => {
       try {
+        console.log('[Admin] Fetching messages for sessionId:', selectedSession);
         const res = await fetch(apiUrl(`/api/chat?sessionId=${selectedSession}`));
         const data = await res.json();
+        console.log('[Admin] Received messages:', data);
+        
         if (Array.isArray(data) && isMounted) {
           const currentHash = JSON.stringify(data.map(m => ({ t: m.createdAt, s: m.sender })));
           
@@ -131,13 +134,16 @@ export function AdminDashboard({ onLogout }) {
               return result;
             });
           }
+        } else {
+          // Data kosong, set empty array
+          if (isMounted) setChatMessages([]);
         }
       } catch (e) {
-        console.error('Error fetching chat:', e);
+        console.error('[Admin] Error fetching chat:', e);
       }
     };
     fetchChat();
-    timer = setInterval(fetchChat, 3000); // Increase from 2.5s to 3s
+    timer = setInterval(fetchChat, 3000); // Poll every 3 seconds
     return () => {
       isMounted = false;
       clearInterval(timer);
