@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Menu, X } from 'lucide-react';
+import { Menu, X, User, LogOut } from 'lucide-react';
 import { Button } from './ui/button';
 import { useNavigate } from 'react-router-dom';
 
-export const Navbar = ({ showDashboard = false }) => {
+export const Navbar = ({ showDashboard = false, isLoggedIn = false, userName = '', onLoginClick, onLogout }) => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [showUserMenu, setShowUserMenu] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -71,12 +72,52 @@ export const Navbar = ({ showDashboard = false }) => {
             >
               Contact Us
             </Button>
-            {showDashboard && (
+            
+            {/* Login/User Menu */}
+            {isLoggedIn ? (
+              <div className="relative">
+                <Button
+                  onClick={() => setShowUserMenu(!showUserMenu)}
+                  className="bg-white/10 hover:bg-white/15 text-white rounded-full px-4 py-2 flex items-center gap-2"
+                >
+                  <User size={18} />
+                  <span className="max-w-[100px] truncate">{userName}</span>
+                </Button>
+                
+                {showUserMenu && (
+                  <div className="absolute right-0 mt-2 w-48 bg-gray-900 border border-gray-800 rounded-lg shadow-xl py-2 z-50">
+                    {showDashboard && (
+                      <button
+                        onClick={() => { setShowUserMenu(false); navigate('/admin'); }}
+                        className="w-full text-left px-4 py-2 text-gray-300 hover:bg-white/5 hover:text-white transition-colors"
+                      >
+                        Dashboard
+                      </button>
+                    )}
+                    <button
+                      onClick={() => navigate('/chat')}
+                      className="w-full text-left px-4 py-2 text-gray-300 hover:bg-white/5 hover:text-white transition-colors"
+                    >
+                      Live Chat
+                    </button>
+                    <hr className="my-2 border-gray-800" />
+                    <button
+                      onClick={() => { setShowUserMenu(false); onLogout(); }}
+                      className="w-full text-left px-4 py-2 text-red-400 hover:bg-red-500/10 transition-colors flex items-center gap-2"
+                    >
+                      <LogOut size={16} />
+                      Logout
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
               <Button
-                onClick={() => navigate('/admin')}
-                className="bg-white/10 hover:bg-white/15 text-white rounded-full px-6"
+                onClick={onLoginClick}
+                className="bg-white/10 hover:bg-white/15 text-white rounded-full px-6 flex items-center gap-2"
               >
-                Dashboard
+                <User size={18} />
+                Login
               </Button>
             )}
           </div>
@@ -120,7 +161,7 @@ export const Navbar = ({ showDashboard = false }) => {
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: navLinks.length * 0.1 }}
-              className="pt-4"
+              className="pt-4 space-y-3"
             >
               <Button
                 onClick={() => scrollToSection('contact')}
@@ -128,15 +169,42 @@ export const Navbar = ({ showDashboard = false }) => {
               >
                 Contact Us
               </Button>
-              {showDashboard && (
-                <div className="mt-3">
+              
+              {isLoggedIn ? (
+                <>
+                  {showDashboard && (
+                    <Button
+                      onClick={() => { setIsMobileMenuOpen(false); navigate('/admin'); }}
+                      className="w-full bg-white/10 hover:bg-white/15 text-white rounded-full py-3 font-semibold"
+                    >
+                      Dashboard
+                    </Button>
+                  )}
                   <Button
-                    onClick={() => { setIsMobileMenuOpen(false); navigate('/admin'); }}
+                    onClick={() => { setIsMobileMenuOpen(false); navigate('/chat'); }}
                     className="w-full bg-white/10 hover:bg-white/15 text-white rounded-full py-3 font-semibold"
                   >
-                    Dashboard
+                    Live Chat
                   </Button>
-                </div>
+                  <div className="text-center text-sm text-gray-400 py-2">
+                    {userName}
+                  </div>
+                  <Button
+                    onClick={() => { setIsMobileMenuOpen(false); onLogout(); }}
+                    className="w-full bg-red-600/20 hover:bg-red-600/30 text-red-400 rounded-full py-3 font-semibold flex items-center justify-center gap-2"
+                  >
+                    <LogOut size={18} />
+                    Logout
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  onClick={() => { setIsMobileMenuOpen(false); onLoginClick(); }}
+                  className="w-full bg-white/10 hover:bg-white/15 text-white rounded-full py-3 font-semibold flex items-center justify-center gap-2"
+                >
+                  <User size={18} />
+                  Login
+                </Button>
               )}
             </motion.div>
           </div>

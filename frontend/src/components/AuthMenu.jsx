@@ -46,8 +46,8 @@ export function AuthMenu({ onAuth }) {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-900 via-purple-800 to-black">
-      <div className="w-full max-w-sm bg-gray-900 rounded-2xl shadow-xl p-8 text-center border border-gray-800">
+    <div className="flex items-center justify-center p-4">
+      <div className="w-full max-w-sm bg-gray-900 rounded-2xl shadow-2xl p-8 text-center border border-gray-800">
         <h2 className="mb-6 text-3xl font-bold text-indigo-400">{isLogin ? "Login" : "Create Account"}</h2>
         <form onSubmit={handleSubmit}>
           {!isLogin && (

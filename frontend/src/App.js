@@ -22,6 +22,7 @@ function App() {
   const [userEmail, setUserEmail] = useState('');
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [showAuthModal, setShowAuthModal] = useState(false);
 
   // Verify session on mount
   useEffect(() => {
@@ -89,6 +90,11 @@ function App() {
     setIsAdmin(false);
   };
 
+  const handleAuthSuccess = (authData) => {
+    setAuth(authData);
+    setShowAuthModal(false);
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-900 via-purple-800 to-black">
@@ -101,10 +107,15 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={
-          !auth ? <AuthMenu onAuth={setAuth} /> :
           isAdmin ? <AdminDashboard onLogout={handleLogout} /> :
           <div className="App">
-            <Navbar showDashboard={isAdmin} />
+            <Navbar 
+              showDashboard={isAdmin} 
+              isLoggedIn={!!auth}
+              userName={auth?.name || auth?.email}
+              onLoginClick={() => setShowAuthModal(true)}
+              onLogout={handleLogout}
+            />
             <Hero />
             <Services />
             <WhyUs />
@@ -114,6 +125,21 @@ function App() {
             <Contact />
             <Footer />
             <Toaster position="top-right" />
+            
+            {/* Auth Modal */}
+            {showAuthModal && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+                <div className="relative">
+                  <button
+                    onClick={() => setShowAuthModal(false)}
+                    className="absolute -top-4 -right-4 z-10 w-10 h-10 flex items-center justify-center bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors"
+                  >
+                    ✕
+                  </button>
+                  <AuthMenu onAuth={handleAuthSuccess} />
+                </div>
+              </div>
+            )}
           </div>
         } />
         <Route path="/admin" element={isAdmin ? <AdminDashboard onLogout={handleLogout} /> : <Navigate to="/" replace />} />
