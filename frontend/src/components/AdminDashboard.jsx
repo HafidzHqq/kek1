@@ -46,7 +46,7 @@ export function AdminDashboard({ onLogout }) {
     const fetchUsers = async () => {
       try {
         const token = localStorage.getItem('authToken');
-        const res = await fetch(apiUrl('/api/auth/users'), {
+        const res = await fetch(apiUrl('/api/auth-v2/users'), {
           headers: { Authorization: `Bearer ${token}` }
         });
         const data = await res.json();
@@ -65,7 +65,7 @@ export function AdminDashboard({ onLogout }) {
     let timer;
     const fetchConversations = async () => {
       try {
-        const res = await fetch(apiUrl('/api/chat'));
+        const res = await fetch(apiUrl('/api/chat-v2'));
         const data = await res.json();
         if (data.conversations) {
           const currentHash = JSON.stringify(data.conversations.map(c => ({ id: c.sessionId, count: c.messageCount, last: c.timestamp })));
@@ -100,7 +100,7 @@ export function AdminDashboard({ onLogout }) {
     const fetchChat = async () => {
       try {
         console.log('[Admin] Fetching messages for sessionId:', selectedSession);
-        const res = await fetch(apiUrl(`/api/chat?sessionId=${selectedSession}`));
+        const res = await fetch(apiUrl(`/api/chat-v2?sessionId=${selectedSession}`));
         const data = await res.json();
         console.log('[Admin] Received messages:', data);
         
@@ -168,7 +168,7 @@ export function AdminDashboard({ onLogout }) {
     setChatInput('');
     
     try {
-      const res = await fetch(apiUrl('/api/chat'), { 
+      const res = await fetch(apiUrl('/api/chat-v2'), { 
         method: 'POST', 
         headers: { 'Content-Type': 'application/json' }, 
         body: JSON.stringify({ sender: 'admin', text: messageText, sessionId: selectedSession }) 

@@ -46,7 +46,7 @@ const Chat = ({ role = 'user', userEmail }) => {
     fetchingRef.current = true;
     try {
       console.log('[Chat] Fetching messages for sessionId:', sessionId);
-      const { data } = await axios.get(apiUrl(`/api/chat?sessionId=${sessionId}`), {
+      const { data } = await axios.get(apiUrl(`/api/chat-v2?sessionId=${sessionId}`), {
         timeout: 8000 // 8 second timeout
       });
       
@@ -98,7 +98,7 @@ const Chat = ({ role = 'user', userEmail }) => {
       if (role !== 'admin') return;
       try {
         const token = localStorage.getItem('authToken');
-        const { data } = await axios.get(apiUrl('/api/auth/users'), {
+        const { data } = await axios.get(apiUrl('/api/auth-v2/users'), {
           headers: { Authorization: `Bearer ${token}` }
         });
         if (data?.success && Array.isArray(data.users)) {
@@ -163,7 +163,7 @@ const Chat = ({ role = 'user', userEmail }) => {
     setInput('');
     
     try {
-      const { data } = await axios.post(apiUrl('/api/chat'), { 
+      const { data } = await axios.post(apiUrl('/api/chat-v2'), { 
         sender: role, 
         text: messageText, 
         sessionId 

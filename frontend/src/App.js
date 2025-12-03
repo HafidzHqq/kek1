@@ -35,7 +35,7 @@ function App() {
       }
 
       try {
-        const { data } = await axios.get(apiUrl('/api/auth/verify'), {
+        const { data } = await axios.get(apiUrl('/api/auth-v2/verify'), {
           headers: { Authorization: `Bearer ${token}` }
         });
 

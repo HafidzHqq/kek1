@@ -16,7 +16,7 @@ export function AuthMenu({ onAuth }) {
     setLoading(true);
     
     try {
-      const endpoint = isLogin ? '/api/auth/login' : '/api/auth/register';
+      const endpoint = isLogin ? '/api/auth-v2/login' : '/api/auth-v2/register';
       const payload = isLogin 
         ? { email, password } 
         : { email, password, name };
