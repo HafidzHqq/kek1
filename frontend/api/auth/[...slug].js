@@ -1,9 +1,12 @@
 const fs = require('fs');
 const path = require('path');
+const { getRedis } = require('../_redis');
 
 const USERS_FILE = path.join('/tmp', 'users-data.json');
 const SESSIONS_FILE = path.join('/tmp', 'sessions-data.json');
 const ADMIN_EMAIL = 'gegefans0@gmail.com';
+const REDIS_USERS_KEY = 'auth:users';
+const REDIS_SESSIONS_KEY = 'auth:sessions';
 
 function setCors(res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -11,41 +14,95 @@ function setCors(res) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 }
 
-function loadUsers() {
+async function loadUsers(redis) {
+  if (redis) {
+    try {
+      const data = await redis.hgetall(REDIS_USERS_KEY);
+      if (data && Object.keys(data).length > 0) {
+        const users = {};
+        for (const [email, json] of Object.entries(data)) {
+          users[email] = JSON.parse(json);
+        }
+        return users;
+      }
+    } catch (e) {
+      console.error('Error loading users from Redis:', e);
+    }
+  }
+  // Fallback to file
   try {
     if (fs.existsSync(USERS_FILE)) {
       return JSON.parse(fs.readFileSync(USERS_FILE, 'utf8'));
     }
   } catch (e) {
-    console.error('Error loading users:', e);
+    console.error('Error loading users from file:', e);
   }
   return {};
 }
 
-function saveUsers(users) {
+async function saveUsers(users, redis) {
+  if (redis) {
+    try {
+      const pipeline = redis.pipeline();
+      for (const [email, user] of Object.entries(users)) {
+        pipeline.hset(REDIS_USERS_KEY, email, JSON.stringify(user));
+      }
+      await pipeline.exec();
+    } catch (e) {
+      console.error('Error saving users to Redis:', e);
+    }
+  }
+  // Also save to file as backup
   try {
     fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2), 'utf8');
   } catch (e) {
-    console.error('Error saving users:', e);
+    console.error('Error saving users to file:', e);
   }
 }
 
-function loadSessions() {
+async function loadSessions(redis) {
+  if (redis) {
+    try {
+      const data = await redis.hgetall(REDIS_SESSIONS_KEY);
+      if (data && Object.keys(data).length > 0) {
+        const sessions = {};
+        for (const [token, json] of Object.entries(data)) {
+          sessions[token] = JSON.parse(json);
+        }
+        return sessions;
+      }
+    } catch (e) {
+      console.error('Error loading sessions from Redis:', e);
+    }
+  }
+  // Fallback to file
   try {
     if (fs.existsSync(SESSIONS_FILE)) {
       return JSON.parse(fs.readFileSync(SESSIONS_FILE, 'utf8'));
     }
   } catch (e) {
-    console.error('Error loading sessions:', e);
+    console.error('Error loading sessions from file:', e);
   }
   return {};
 }
 
-function saveSessions(sessions) {
+async function saveSessions(sessions, redis) {
+  if (redis) {
+    try {
+      const pipeline = redis.pipeline();
+      for (const [token, session] of Object.entries(sessions)) {
+        pipeline.hset(REDIS_SESSIONS_KEY, token, JSON.stringify(session));
+      }
+      await pipeline.exec();
+    } catch (e) {
+      console.error('Error saving sessions to Redis:', e);
+    }
+  }
+  // Also save to file as backup
   try {
     fs.writeFileSync(SESSIONS_FILE, JSON.stringify(sessions, null, 2), 'utf8');
   } catch (e) {
-    console.error('Error saving sessions:', e);
+    console.error('Error saving sessions to file:', e);
   }
 }
 
@@ -70,8 +127,9 @@ module.exports = async function handler(req, res) {
   const { pathname } = require('url').parse(req.url, true);
   const endpoint = pathname.replace('/api/auth', '');
   
-  const users = loadUsers();
-  const sessions = loadSessions();
+  const redis = await getRedis();
+  const users = await loadUsers(redis);
+  const sessions = await loadSessions(redis);
 
   // POST /api/auth/register
   if (req.method === 'POST' && endpoint === '/register') {
@@ -97,7 +155,7 @@ module.exports = async function handler(req, res) {
       role,
       createdAt: new Date().toISOString()
     };
-    saveUsers(users);
+    await saveUsers(users, redis);
     
     const token = generateToken();
     sessions[token] = {
@@ -106,7 +164,7 @@ module.exports = async function handler(req, res) {
       createdAt: new Date().toISOString(),
       expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
     };
-    saveSessions(sessions);
+    await saveSessions(sessions, redis);
     
     return res.status(200).json({
       success: true,
@@ -139,7 +197,7 @@ module.exports = async function handler(req, res) {
       createdAt: new Date().toISOString(),
       expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
     };
-    saveSessions(sessions);
+    await saveSessions(sessions, redis);
     
     return res.status(200).json({
       success: true,
@@ -164,7 +222,10 @@ module.exports = async function handler(req, res) {
     
     if (new Date(session.expiresAt) < new Date()) {
       delete sessions[token];
-      saveSessions(sessions);
+      if (redis) {
+        await redis.hdel(REDIS_SESSIONS_KEY, token);
+      }
+      await saveSessions(sessions, redis);
       return res.status(401).json({ error: 'Session expired' });
     }
     
@@ -208,7 +269,10 @@ module.exports = async function handler(req, res) {
     
     if (token && sessions[token]) {
       delete sessions[token];
-      saveSessions(sessions);
+      if (redis) {
+        await redis.hdel(REDIS_SESSIONS_KEY, token);
+      }
+      await saveSessions(sessions, redis);
     }
     
     return res.status(200).json({ success: true });

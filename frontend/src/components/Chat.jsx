@@ -154,7 +154,7 @@ const Chat = ({ role = 'user', userEmail }) => {
       {role === 'admin' && (
         <div className="bg-gray-950 border-r border-purple-700 overflow-y-auto">
           <div className="px-4 py-4 border-b border-purple-700 flex items-center justify-between">
-            <div className="font-semibold">Daftar Chat</div>
+            <div className="font-semibold">Daftar User</div>
             <div className="text-xs bg-purple-700/30 px-2 py-1 rounded-full">{users.length}</div>
           </div>
           <div>
