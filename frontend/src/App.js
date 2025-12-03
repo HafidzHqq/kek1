@@ -108,7 +108,7 @@ function App() {
       <Routes>
         <Route path="/" element={
           isAdmin ? <AdminDashboard onLogout={handleLogout} /> :
-          <div className="App">
+          <div className="App bg-black min-h-screen">
             <Navbar 
               showDashboard={isAdmin} 
               isLoggedIn={!!auth}
@@ -116,13 +116,25 @@ function App() {
               onLoginClick={() => setShowAuthModal(true)}
               onLogout={handleLogout}
             />
-            <Hero />
-            <Services />
+            <div id="home">
+              <Hero />
+            </div>
+            <div id="services">
+              <Services />
+            </div>
             <WhyUs />
-            <Portfolio />
-            <Testimonials />
-            <Pricing />
-            <Contact />
+            <div id="portfolio">
+              <Portfolio />
+            </div>
+            <div id="testimonials">
+              <Testimonials />
+            </div>
+            <div id="pricing">
+              <Pricing />
+            </div>
+            <div id="contact">
+              <Contact />
+            </div>
             <Footer />
             <Toaster position="top-right" />
             
