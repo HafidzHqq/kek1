@@ -1,4 +1,11 @@
 {
+  "name": "kek1",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "install-frontend": "cd frontend && npm install",
+    "build": "cd frontend && npm install && npm run build"
+  },
   "devDependencies": {
     "ajv": "^6.12.6",
     "ajv-keywords": "^3.5.2"
