@@ -60,10 +60,8 @@ export function AdminDashboard({ onLogout }) {
     fetchUsers();
   }, []);
 
-  // Polling untuk daftar conversations
+  // Polling untuk daftar conversations - selalu fetch meskipun tidak di tab chat
   useEffect(() => {
-    if (active !== 'chat') return; // Only poll when chat tab is active
-    
     let timer;
     const fetchConversations = async () => {
       try {
@@ -77,8 +75,8 @@ export function AdminDashboard({ onLogout }) {
             lastConversationsHash.current = currentHash;
             setConversations(data.conversations);
             
-            // Auto-select first conversation only once
-            if (!hasAutoSelected.current && !selectedSession && data.conversations.length > 0) {
+            // Auto-select first conversation only once when entering chat tab
+            if (active === 'chat' && !hasAutoSelected.current && !selectedSession && data.conversations.length > 0) {
               setSelectedSession(data.conversations[0].sessionId);
               hasAutoSelected.current = true;
             }
@@ -89,7 +87,7 @@ export function AdminDashboard({ onLogout }) {
       }
     };
     fetchConversations();
-    timer = setInterval(fetchConversations, 5000); // Increase from 3s to 5s
+    timer = setInterval(fetchConversations, 5000); // Poll every 5 seconds
     return () => clearInterval(timer);
   }, [selectedSession, active]);
 
