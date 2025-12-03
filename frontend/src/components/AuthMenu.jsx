@@ -39,7 +39,11 @@ export function AuthMenu({ onAuth }) {
       }
     } catch (err) {
       console.error('Auth error:', err);
-      setError(err.response?.data?.error || 'Terjadi kesalahan. Silakan coba lagi.');
+      // Extract error message safely
+      const errorMessage = err.response?.data?.error 
+        || err.message 
+        || 'Terjadi kesalahan. Silakan coba lagi.';
+      setError(String(errorMessage));
     } finally {
       setLoading(false);
     }
