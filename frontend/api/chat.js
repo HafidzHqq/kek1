@@ -153,41 +153,54 @@ export default async function handler(req, res) {
         let entries;
         try {
           entries = await redis.xrange(streamKey, '-', '+');
-          console.log('[Chat API] xrange returned type:', typeof entries, Array.isArray(entries));
-          console.log('[Chat API] Raw entries:', JSON.stringify(entries).substring(0, 200));
+          console.log('[Chat API v2] xrange returned type:', typeof entries, 'isArray:', Array.isArray(entries));
+          console.log('[Chat API v2] Raw entries sample:', JSON.stringify(entries).substring(0, 300));
         } catch (e) {
-          console.error('[Chat API] Error reading stream:', e.message);
-          console.log('[Chat API] Falling back to file storage');
+          console.error('[Chat API v2] Error reading stream:', e.message);
+          console.log('[Chat API v2] Falling back to file storage');
           return handleWithFileStorage();
         }
 
-        // Handle different response formats from Upstash
+        // Handle different response formats from Upstash - SAFE version
         let messages = [];
         
-        if (Array.isArray(entries)) {
-          // Standard Redis format: [[id, [field, value, ...]], ...]
-          messages = entries.map(([id, fields]) => {
-            const obj = Array.isArray(fields) ? Object.fromEntries(
-              fields.reduce((acc, val, idx, arr) => {
-                if (idx % 2 === 0) acc.push([val, arr[idx + 1]]);
-                return acc;
-              }, [])
-            ) : fields;
-            
-            return {
-              id,
-              sender: obj.sender || 'user',
-              text: obj.text || '',
-              createdAt: obj.createdAt || toIso(id),
-            };
-          });
-        } else if (entries && typeof entries === 'object') {
-          // Alternative format - try to extract data
-          console.log('[Chat API] Non-array response, attempting to parse');
+        try {
+          if (!entries) {
+            console.log('[Chat API v2] Entries is null/undefined');
+            messages = [];
+          } else if (Array.isArray(entries) && entries.length > 0) {
+            console.log('[Chat API v2] Processing', entries.length, 'entries');
+            // Standard Redis format: [[id, [field, value, ...]], ...]
+            messages = entries.map(([id, fields]) => {
+              const obj = Array.isArray(fields) ? Object.fromEntries(
+                fields.reduce((acc, val, idx, arr) => {
+                  if (idx % 2 === 0) acc.push([val, arr[idx + 1]]);
+                  return acc;
+                }, [])
+              ) : (typeof fields === 'object' ? fields : {});
+              
+              return {
+                id,
+                sender: obj.sender || 'user',
+                text: obj.text || '',
+                createdAt: obj.createdAt || toIso(id),
+              };
+            });
+          } else if (entries && typeof entries === 'object') {
+            // Alternative format - try to extract data
+            console.log('[Chat API v2] Non-array response, structure:', Object.keys(entries));
+            messages = [];
+          } else {
+            console.log('[Chat API v2] Unknown entries format:', typeof entries);
+            messages = [];
+          }
+        } catch (parseError) {
+          console.error('[Chat API v2] Error parsing entries:', parseError.message);
+          console.log('[Chat API v2] Falling back to empty array');
           messages = [];
         }
 
-        console.log('[Chat API] Parsed', messages.length, 'messages for', sessionId);
+        console.log('[Chat API v2] Returning', messages.length, 'messages for', sessionId);
         return res.status(200).json(messages);
       }
 
