@@ -45,6 +45,7 @@ export default async function handler(req, res) {
 
   const redis = await getRedis();
   console.log('[Chat API] Redis status:', redis ? '✅ Connected' : '❌ Using file storage');
+  console.log('[Chat API] Request:', req.method, req.url);
 
   // Helper: fallback to file-based storage when Redis isn't configured
   async function handleWithFileStorage() {
@@ -87,6 +88,7 @@ export default async function handler(req, res) {
       console.log('[Chat API] File storage: Saving message for', sessionId);
 
       const msg = {
+        id: `file-${Date.now()}`,
         sender,
         text,
         createdAt: new Date().toISOString(),
@@ -99,7 +101,7 @@ export default async function handler(req, res) {
       chatData.conversations[sessionId].push(msg);
       saveMessages(chatData);
 
-      console.log('[Chat API] File storage: Message saved');
+      console.log('[Chat API] File storage: Message saved, total messages:', chatData.conversations[sessionId].length);
       return res.status(200).json(msg);
     }
 
@@ -119,6 +121,7 @@ export default async function handler(req, res) {
 
   // If Redis isn't set up, use file fallback
   if (!redis) {
+    console.log('[Chat API] Redis not configured, using file storage');
     return handleWithFileStorage();
   }
 
@@ -151,9 +154,11 @@ export default async function handler(req, res) {
         try {
           entries = await redis.xrange(streamKey, '-', '+');
           console.log('[Chat API] xrange returned:', entries ? entries.length : 0, 'entries');
+          console.log('[Chat API] Raw entries:', JSON.stringify(entries));
         } catch (e) {
-          console.error('[Chat API] Error reading stream:', e);
-          return res.status(200).json([]);
+          console.error('[Chat API] Error reading stream:', e.message);
+          console.log('[Chat API] Falling back to file storage');
+          return handleWithFileStorage();
         }
 
         const messages = (entries || []).map(([id, fields]) => {
