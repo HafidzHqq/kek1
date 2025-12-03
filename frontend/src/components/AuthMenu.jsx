@@ -1,9 +1,12 @@
 import React, { useState } from "react";
+import axios from "axios";
+import { apiUrl } from "../lib/api";
 
 export function AuthMenu({ onAuth }) {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [name, setName] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -11,22 +14,35 @@ export function AuthMenu({ onAuth }) {
     e.preventDefault();
     setError("");
     setLoading(true);
-    if (!isLogin && password.length < 6) {
-      setError("Password minimal 6 karakter.");
-      setLoading(false);
-      return;
-    }
-    // Dummy login/register
-    if (isLogin) {
-      if (email === "gegefans0@gmail.com" && password === "admin123") {
-        onAuth({ role: "admin", email: email });
+    
+    try {
+      const endpoint = isLogin ? '/api/auth/login' : '/api/auth/register';
+      const payload = isLogin 
+        ? { email, password } 
+        : { email, password, name };
+      
+      const { data } = await axios.post(apiUrl(endpoint), payload);
+      
+      if (data.success && data.token) {
+        // Store token in localStorage
+        localStorage.setItem('authToken', data.token);
+        localStorage.setItem('userEmail', data.user.email);
+        
+        onAuth({ 
+          role: data.user.role, 
+          email: data.user.email,
+          name: data.user.name,
+          token: data.token
+        });
       } else {
-        onAuth({ role: "user", email: email });
+        setError(data.error || 'Login gagal');
       }
-    } else {
-      onAuth({ role: "user", email: email });
+    } catch (err) {
+      console.error('Auth error:', err);
+      setError(err.response?.data?.error || 'Terjadi kesalahan. Silakan coba lagi.');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   return (
@@ -34,11 +50,16 @@ export function AuthMenu({ onAuth }) {
       <div className="w-full max-w-sm bg-gray-900 rounded-2xl shadow-xl p-8 text-center border border-gray-800">
         <h2 className="mb-6 text-3xl font-bold text-indigo-400">{isLogin ? "Login" : "Create Account"}</h2>
         <form onSubmit={handleSubmit}>
+          {!isLogin && (
+            <div className="mb-4">
+              <input type="text" placeholder="Nama" value={name} onChange={e => setName(e.target.value)} className="w-full px-4 py-3 rounded-lg border border-gray-700 bg-gray-800 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+            </div>
+          )}
           <div className="mb-4">
-            <input type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} className="w-full px-4 py-3 rounded-lg border border-gray-700 bg-gray-800 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+            <input type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} required className="w-full px-4 py-3 rounded-lg border border-gray-700 bg-gray-800 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
           </div>
           <div className="mb-4">
-            <input type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} className="w-full px-4 py-3 rounded-lg border border-gray-700 bg-gray-800 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500" />
+            <input type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} required minLength={6} className="w-full px-4 py-3 rounded-lg border border-gray-700 bg-gray-800 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500" />
           </div>
           {error && <div className="text-red-400 mb-4 font-semibold">{error}</div>}
           <button type="submit" disabled={loading} className="w-full py-3 rounded-lg bg-gradient-to-r from-indigo-600 via-purple-600 to-black text-white font-bold text-lg shadow-md hover:from-indigo-700 hover:via-purple-700 hover:to-gray-900 transition">{loading ? "Loading..." : isLogin ? "Login" : "Create Account"}</button>

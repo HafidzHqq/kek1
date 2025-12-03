@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import axios from 'axios';
+import { apiUrl } from './lib/api';
 import Chat from './components/Chat';
 import './App.css';
 import { Navbar } from './components/Navbar';
@@ -19,8 +21,46 @@ function App() {
   const [auth, setAuth] = useState(null);
   const [userEmail, setUserEmail] = useState('');
   const [isAdmin, setIsAdmin] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  React.useEffect(() => {
+  // Verify session on mount
+  useEffect(() => {
+    const verifySession = async () => {
+      const token = localStorage.getItem('authToken');
+      if (!token) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const { data } = await axios.get(apiUrl('/api/auth/verify'), {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+
+        if (data.success && data.user) {
+          setAuth({
+            role: data.user.role,
+            email: data.user.email,
+            name: data.user.name,
+            token
+          });
+        } else {
+          localStorage.removeItem('authToken');
+          localStorage.removeItem('userEmail');
+        }
+      } catch (err) {
+        console.error('Session verification failed:', err);
+        localStorage.removeItem('authToken');
+        localStorage.removeItem('userEmail');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    verifySession();
+  }, []);
+
+  useEffect(() => {
     if (auth && auth.role === "admin") {
       setIsAdmin(true);
       setUserEmail(auth.email);
@@ -30,12 +70,39 @@ function App() {
     }
   }, [auth]);
 
+  const handleLogout = async () => {
+    const token = localStorage.getItem('authToken');
+    if (token) {
+      try {
+        await axios.post(apiUrl('/api/auth/logout'), {}, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+      } catch (err) {
+        console.error('Logout error:', err);
+      }
+    }
+    
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('userEmail');
+    setAuth(null);
+    setUserEmail('');
+    setIsAdmin(false);
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-900 via-purple-800 to-black">
+        <div className="text-white text-xl">Loading...</div>
+      </div>
+    );
+  }
+
   return (
     <BrowserRouter>
       <Routes>
         <Route path="/" element={
           !auth ? <AuthMenu onAuth={setAuth} /> :
-          isAdmin ? <AdminDashboard onLogout={() => setAuth(null)} /> :
+          isAdmin ? <AdminDashboard onLogout={handleLogout} /> :
           <div className="App">
             <Navbar showDashboard={isAdmin} />
             <Hero />
@@ -49,7 +116,7 @@ function App() {
             <Toaster position="top-right" />
           </div>
         } />
-        <Route path="/admin" element={isAdmin ? <AdminDashboard onLogout={() => { setAuth(null); setUserEmail(''); }} /> : <Navigate to="/" replace />} />
+        <Route path="/admin" element={isAdmin ? <AdminDashboard onLogout={handleLogout} /> : <Navigate to="/" replace />} />
         <Route path="/chat" element={<Chat role={isAdmin ? 'admin' : 'user'} userEmail={userEmail} />} />
       </Routes>
     </BrowserRouter>
