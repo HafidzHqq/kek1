@@ -136,11 +136,25 @@ export default async function handler(req, res) {
       if (sessionId) {
         console.log('[Chat API] GET messages for sessionId:', sessionId);
         const streamKey = `${STREAM_PREFIX}${sessionId}`;
-        // Read messages after a cursor if provided, else recent window
-        const start = cursor ? `(${cursor}` : '-';
-        const entries = await redis.xrange(streamKey, start, '+', {
-          count,
-        });
+        
+        // Check if stream exists
+        const exists = await redis.exists(streamKey);
+        console.log('[Chat API] Stream exists:', exists);
+        
+        if (!exists) {
+          console.log('[Chat API] Stream not found, returning empty array');
+          return res.status(200).json([]);
+        }
+        
+        // Read all messages from stream (simplified query)
+        let entries;
+        try {
+          entries = await redis.xrange(streamKey, '-', '+');
+          console.log('[Chat API] xrange returned:', entries ? entries.length : 0, 'entries');
+        } catch (e) {
+          console.error('[Chat API] Error reading stream:', e);
+          return res.status(200).json([]);
+        }
 
         const messages = (entries || []).map(([id, fields]) => {
           const obj = Object.fromEntries(fields);
@@ -157,24 +171,35 @@ export default async function handler(req, res) {
       }
 
       // Conversations list
+      console.log('[Chat API] GET conversations list');
       const sessionIds = (await redis.smembers(SESSIONS_KEY)) || [];
+      console.log('[Chat API] Found', sessionIds.length, 'sessions:', sessionIds);
+      
       const convs = [];
       for (const id of sessionIds) {
         const key = `${STREAM_PREFIX}${id}`;
-        const last = await redis.xrevrange(key, '+', '-', { count: 1 });
-        const length = (await redis.xlen(key)) || 0;
-        const [lastId, lastFields] = last?.[0] || [null, []];
-        const lastObj = Object.fromEntries(lastFields || []);
-        convs.push({
-          sessionId: id,
-          lastMessage: lastObj.text || '',
-          lastSender: lastObj.sender || 'user',
-          timestamp: lastObj.createdAt || (lastId ? toIso(lastId) : new Date(0).toISOString()),
-          unread: 0,
-          messageCount: length,
-        });
+        try {
+          const last = await redis.xrevrange(key, '+', '-');
+          const length = (await redis.xlen(key)) || 0;
+          
+          // Take first item (most recent)
+          const [lastId, lastFields] = last?.[0] || [null, []];
+          const lastObj = Object.fromEntries(lastFields || []);
+          
+          convs.push({
+            sessionId: id,
+            lastMessage: lastObj.text || '',
+            lastSender: lastObj.sender || 'user',
+            timestamp: lastObj.createdAt || (lastId ? toIso(lastId) : new Date(0).toISOString()),
+            unread: 0,
+            messageCount: length,
+          });
+        } catch (e) {
+          console.error('[Chat API] Error reading stream for', id, ':', e);
+        }
       }
       convs.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+      console.log('[Chat API] Returning', convs.length, 'conversations');
       return res.status(200).json({ conversations: convs });
     }
 
