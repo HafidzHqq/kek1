@@ -58,7 +58,7 @@ export const Hero = () => {
             className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-purple-500/30 bg-purple-500/10 backdrop-blur-sm"
           >
             <Sparkles className="w-4 h-4 text-purple-400" />
-            <span className="text-sm text-purple-300">Award-Winning Digital Agency</span>
+            <span className="text-sm text-purple-300">Inovatech Solutions</span>
           </motion.div>
 
           {/* Main Heading */}
@@ -116,9 +116,9 @@ export const Hero = () => {
             className="grid grid-cols-2 md:grid-cols-4 gap-8 pt-12 max-w-4xl mx-auto"
           >
             {[
-              { number: '200+', label: 'Projects Completed' },
-              { number: '150+', label: 'Happy Clients' },
-              { number: '15+', label: 'Team Members' },
+              { number: '10+', label: 'Projects Completed' },
+              { number: '8+', label: 'Happy Clients' },
+              { number: '3', label: 'Team Members' },
               { number: '98%', label: 'Client Satisfaction' },
             ].map((stat, index) => (
               <motion.div
