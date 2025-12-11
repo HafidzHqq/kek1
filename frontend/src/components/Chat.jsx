@@ -244,11 +244,12 @@ const Chat = ({ role = 'user', userEmail }) => {
             )}
           </div>
         </div>
+        </>
       )}
 
       {/* Area Chat */}
       <div className="flex flex-col flex-1 min-w-0">
-      <div className="py-3 px-4 md:py-4 md:px-6 bg-gray-950 border-b border-purple-700 flex items-center justify-between safe-top">
+        <div className="py-3 px-4 md:py-4 md:px-6 bg-gray-950 border-b border-purple-700 flex items-center justify-between safe-top">
         <div className="flex items-center gap-2 md:gap-3 flex-1 min-w-0">
           {/* Mobile menu button for admin */}
           {role === 'admin' && (
